@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KwikServe Rider</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--g:#0b6b2e;--gd:#07501f;--y:#f5c518;--bg:#f6f8f6;--t:#14211a;--m:#6b7a70;--line:#e2e8e3}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:var(--bg);color:var(--t);max-width:480px;margin:0 auto;min-height:100vh}
+.screen{display:none;min-height:100vh;padding:18px 18px 96px}
+.screen.on{display:block}
+#splash{background:var(--g);color:#fff;text-align:center;padding-top:30vh}
+#splash h1{font-size:44px;letter-spacing:-1px}#splash h1 span{color:var(--y)}#splash p{margin-top:12px;opacity:.9}
+.logo{font-size:30px;font-weight:800;color:var(--g);text-align:center;margin:18px 0 4px}.logo span{color:var(--y)}
+h2{font-size:22px;margin:10px 0 4px}
+.sub{color:var(--m);font-size:14px;margin-bottom:14px}
+.c{text-align:center}
+input,select{width:100%;padding:14px;border:1px solid var(--line);border-radius:10px;font-size:15px;margin-bottom:12px;background:#fff}
+input:focus,select:focus{outline:2px solid var(--g)}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:10px;background:var(--g);color:#fff;font-size:15px;font-weight:700;margin-top:6px;text-align:center;text-decoration:none}
+.btn.ghost{background:#fff;color:var(--g);border:2px solid var(--g)}
+.btn.red{background:#fff;color:#c0392b;border:2px solid #c0392b}
+.link{color:var(--g);font-weight:600;cursor:pointer}
+.center{text-align:center;font-size:14px;color:var(--m);margin-top:14px}
+.err{color:#c0392b;font-size:13px;margin-bottom:10px;display:none}
+.back{border:0;background:none;font-size:15px;font-weight:700;color:var(--t);margin-bottom:8px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.av{width:48px;height:48px;border-radius:50%;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex:none}
+.av.lg{width:70px;height:70px;font-size:28px}
+.tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dff3e5;color:var(--g);white-space:nowrap}
+.tag.off{background:#eee;color:#666}.tag.y{background:#fdecc8;color:#8a5a00}.tag.r{background:#fde1de;color:#c0392b}
+.earn{background:var(--g);color:#fff;border-radius:16px;padding:18px;margin-bottom:14px}
+.earn small{opacity:.9}.earn b{display:block;font-size:30px;margin:2px 0 10px}
+.earn button{background:none;border:1px solid #fff;color:#fff;border-radius:20px;padding:6px 16px;font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;font-size:13px;color:var(--m);font-weight:600}
+.tile i{display:block;font-style:normal;font-size:24px;margin-bottom:4px}.tile b{display:block;font-size:24px;color:var(--t)}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;font-size:14px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.card small{display:block;color:var(--m);margin-top:3px}
+.switch{display:flex;justify-content:space-between;align-items:center;background:var(--g);color:#fff;border-radius:14px;padding:16px;margin-bottom:14px;font-weight:700}
+.tg{width:48px;height:26px;border-radius:20px;background:#bbb;position:relative;flex:none;border:0}
+.tg:after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.15s}
+.tg.on{background:var(--y)}.tg.on:after{left:25px}
+.tgd{background:#cfd6d1}.tgd.on{background:var(--g)}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;border:0;background:#e9eee9;border-radius:20px;padding:9px;font-weight:600;color:var(--m);font-size:13px}
+.tabs button.on{background:var(--g);color:#fff}
+.map{height:200px;border-radius:16px;margin:10px 0;background:linear-gradient(135deg,#dfeee3,#cfe3d5);position:relative;overflow:hidden}
+.map:before{content:"";position:absolute;left:12%;top:70%;width:70%;height:4px;background:#2a7de1;transform:rotate(-28deg);transform-origin:left}
+.map span{position:absolute;font-size:26px}
+.steps{display:flex;justify-content:space-between;margin:12px 0;font-size:12px;color:var(--m);text-align:center}
+.steps div{flex:1}.steps i{display:block;width:26px;height:26px;border-radius:50%;background:var(--line);margin:0 auto 4px;line-height:26px;font-style:normal;color:#fff;font-weight:700}
+.steps .on{color:var(--g);font-weight:700}.steps .on i{background:var(--g)}
+.chart{display:flex;align-items:flex-end;gap:8px;height:130px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 12px 8px;margin:10px 0}
+.chart div{flex:1;text-align:center;font-size:11px;color:var(--m);display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.chart i{display:block;background:var(--g);border-radius:4px 4px 0 0;min-height:3px}
+.item{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;font-weight:600;font-size:14px}
+.item span{color:var(--m);font-weight:400}
+.big{text-align:center;margin:20px 0}.big .ok{width:90px;height:90px;border-radius:50%;background:var(--g);color:#fff;font-size:46px;line-height:90px;margin:0 auto 12px}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--line);display:none;justify-content:space-around;padding:8px 0 calc(10px + env(safe-area-inset-bottom,0px));z-index:9}
+nav.on{display:flex}
+nav button{border:0;background:none;color:var(--m);font-size:12px;font-weight:600}
+nav button i{display:block;font-style:normal;font-size:21px}nav button.on{color:var(--g)}
+#lmap{height:230px;border-radius:16px;margin:10px 0;z-index:0}
+</style>
+</head>
+<body>
+
+<section class="screen on" id="splash"><h1>Kwik<span>Serve</span></h1><p>Fast and reliable parcel<br>delivery across Ghana.</p></section>
+
+<section class="screen" id="login">
+  <div class="logo">Kwik<span>Serve</span></div>
+  <h2 class="c">Rider Login</h2><p class="sub c">Welcome back! Please login to your rider account.</p>
+  <input id="lEmail" type="email" placeholder="Email address">
+  <input id="lPass" type="password" placeholder="Password">
+  <p style="text-align:right;margin:-4px 0 10px;font-size:13px"><span class="link" onclick="forgot()">Forgot password?</span></p>
+  <div class="err" id="lErr"></div>
+  <button class="btn" onclick="doLogin()">Login</button>
+  <p class="center" style="margin:10px 0">OR</p>
+  <button class="btn ghost" onclick="googleLogin()">Continue with Google</button>
+  <p class="center">Don't have an account? <span class="link" onclick="go('register')">Register</span></p>
+</section>
+
+<section class="screen" id="register">
+  <button class="back" onclick="go('login')">←</button>
+  <h2>Create Rider Account</h2><p class="sub">New riders are approved by KwikServe before they can take orders.</p>
+  <input id="rName" placeholder="Full name">
+  <input id="rPhone" type="tel" placeholder="Phone number">
+  <input id="rEmail" type="email" placeholder="Email address">
+  <input id="rPass" type="password" placeholder="Password (6+ characters)">
+  <p style="font-weight:700;margin:6px 0 8px">Vehicle details</p>
+  <select id="rBike"><option>Motorcycle</option><option>Bicycle</option><option>Car / Van</option></select>
+  <input id="rPlate" placeholder="License plate number">
+  <div class="err" id="rErr"></div>
+  <button class="btn" onclick="doRegister()">Register</button>
+  <p class="center" style="font-size:12px">By creating an account, you agree to our Terms &amp; Conditions and Privacy Policy.</p>
+</section>
+
+<section class="screen" id="home">
+  <div class="top"><div style="display:flex;gap:12px;align-items:center"><div class="av" id="hAv"></div><div><small class="sub" id="hGreet" style="margin:0"></small><br><b id="hName"></b></div></div><button class="back" style="font-size:22px;margin:0" onclick="go('notifs')">🔔</button></div>
+  <div class="earn"><small>Today's earnings</small><b id="hToday">GH₵ 0</b><button onclick="go('earnings')">View details</button></div>
+  <div class="grid">
+    <div class="tile" onclick="document.getElementById('reqs').scrollIntoView()"><i>📦</i>New orders<b id="hNew">0</b></div>
+    <div class="tile" onclick="go('deliveries','on')"><i>🏍️</i>On going<b id="hOn">0</b></div>
+    <div class="tile" onclick="go('deliveries','done')"><i>✅</i>Completed<b id="hDone">0</b></div>
+    <div class="tile" onclick="go('deliveries','canc')"><i>❌</i>Cancelled<b id="hCanc">0</b></div>
+  </div>
+  <div class="switch"><span id="hOnlineTxt">Go Online</span><button class="tg" id="hTg" onclick="toggleOnline()"></button></div>
+  <h2 id="reqs">New delivery requests</h2>
+  <div id="reqList"></div>
+</section>
+
+<section class="screen" id="request">
+  <button class="back" onclick="go('home')">← New Delivery Request</button>
+  <div id="reqBox"></div>
+</section>
+
+<section class="screen" id="ongoing">
+  <button class="back" onclick="go('home')">← On Delivery</button>
+  <div id="ongBox"></div>
+</section>
+
+<section class="screen" id="done">
+  <button class="back" onclick="go('home')">← Delivery Completed</button>
+  <div class="big"><div class="ok">✓</div><p id="dId" class="sub" style="margin:0"></p><h2 style="color:var(--g)">Successfully Delivered!</h2></div>
+  <div class="card"><div class="row"><b>Earnings</b><b id="dEarn" style="font-size:22px;color:var(--g)"></b></div></div>
+  <button class="btn" onclick="go('deliveries','done')">View details</button>
+  <button class="btn ghost" onclick="go('home')">Back to home</button>
+</section>
+
+<section class="screen" id="deliveries">
+  <h2>My Deliveries</h2>
+  <div class="tabs" id="dTabs" style="margin-top:10px">
+    <button onclick="setDT('on')" data-t="on">Ongoing</button><button onclick="setDT('done')" data-t="done">Completed</button><button onclick="setDT('canc')" data-t="canc">Cancelled</button>
+  </div>
+  <div id="dList"></div>
+</section>
+
+<section class="screen" id="earnings">
+  <h2>Earnings</h2>
+  <div class="earn"><small>Total earnings</small><b id="eTotal"></b></div>
+  <p style="font-weight:700">This week</p>
+  <div class="chart" id="eChart"></div>
+  <div class="grid"><div class="tile">Today's earnings<b id="eToday"></b></div><div class="tile">Completed deliveries<b id="eCount"></b></div></div>
+  <button class="btn" onclick="go('statement')">View statement</button>
+</section>
+
+<section class="screen" id="statement">
+  <button class="back" onclick="go('earnings')">← Statement</button>
+  <div id="stList"></div>
+</section>
+
+<section class="screen" id="profile">
+  <h2>Profile</h2>
+  <div class="row" style="justify-content:flex-start;gap:14px;margin:12px 0"><div class="av lg" id="pAv"></div><div><b style="font-size:20px" id="pName"></b><br><span class="tag" id="pTag">Online</span></div></div>
+  <div class="card"><small style="margin:0">📞 <span id="pPhone"></span></small><small>✉️ <span id="pEmail"></span></small><small>🏍️ <span id="pBike"></span></small><small>🪪 <span id="pPlate"></span></small></div>
+  <div class="item" onclick="openEdit('p')">Edit Profile<span>›</span></div>
+  <div class="item" onclick="openEdit('v')">Vehicle Information<span>›</span></div>
+  <div class="item" onclick="go('docs')">Documents<span>›</span></div>
+  <div class="item" onclick="changePw()">Change Password<span>›</span></div>
+  <div class="item" onclick="go('help')">Help &amp; Support<span>›</span></div>
+  <div class="item" onclick="go('settings')">Settings<span>›</span></div>
+</section>
+
+<section class="screen" id="editp">
+  <button class="back" onclick="go('profile')">← <span id="eTitle"></span></button>
+  <div id="eFields"></div>
+  <button class="btn" onclick="saveEdit()">Save changes</button>
+</section>
+
+<section class="screen" id="notifs">
+  <button class="back" onclick="go('home')">← Notifications</button>
+  <div id="nList"></div>
+</section>
+
+<section class="screen" id="settings">
+  <button class="back" onclick="go('profile')">← Settings</button>
+  <div class="item">Language<span>English</span></div>
+  <div class="item">Notifications<button class="tg tgd" data-k="notif" onclick="tgl(this)"></button></div>
+  <div class="item">Sound<button class="tg tgd" data-k="sound" onclick="tgl(this)"></button></div>
+  <div class="item" onclick="go('help')">Help &amp; Support<span>›</span></div>
+  <div class="item">About KwikServe<span>v1.0.0</span></div>
+  <button class="btn red" onclick="logout()">Log out</button>
+</section>
+
+<section class="screen" id="help">
+  <button class="back" onclick="go('profile')">← Help &amp; Support</button>
+  <div class="card"><b>How do I get orders?</b><small>Go online on the Home screen. New requests appear there once the admin accepts a customer order.</small></div>
+  <div class="card"><b>How do I get paid?</b><small>Your earnings are shown on the Earnings screen after each delivery is marked delivered.</small></div>
+  <div class="card"><b>Need more help?</b><small>Contact KwikServe support.</small></div>
+</section>
+
+<section class="screen" id="complete">
+  <h2>Finish your rider account</h2><p class="sub">Add your phone and vehicle details. KwikServe approves new riders before they can take orders.</p>
+  <input id="cPhone" type="tel" placeholder="Phone number">
+  <select id="cBike"><option>Motorcycle</option><option>Bicycle</option><option>Car / Van</option></select>
+  <input id="cPlate" placeholder="License plate number">
+  <button class="btn" onclick="completeProfile()">Submit for approval</button>
+  <p class="center"><span class="link" onclick="cancelComplete()">Cancel</span></p>
+</section>
+
+<section class="screen" id="docs">
+  <button class="back" onclick="go('profile')">← Documents</button>
+  <p class="sub">Upload clear photos. KwikServe uses them to verify you.</p>
+  <div id="docList"></div>
+</section>
+
+<nav id="nav">
+  <button data-t="home" onclick="go('home')"><i>🏠</i>Home</button>
+  <button data-t="deliveries" onclick="go('deliveries','on')"><i>📦</i>My Deliveries</button>
+  <button data-t="earnings" onclick="go('earnings')"><i>💰</i>Earnings</button>
+  <button data-t="profile" onclick="go('profile')"><i>👤</i>Profile</button>
+</nav>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,sendPasswordResetEmail,signOut,onAuthStateChanged,updateProfile,signInWithPopup,GoogleAuthProvider} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,setDoc,getDoc,updateDoc,collection,query,where,getDocs,runTransaction,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyB2PwMANFFwt8Q1Lr3que1MmMfNFJM1fCs",
+  authDomain: "kwikserve-b381d.firebaseapp.com",
+  projectId: "kwikserve-b381d",
+  storageBucket: "kwikserve-b381d.firebasestorage.app",
+  messagingSenderId: "708250783049",
+  appId: "1:708250783049:web:a47018811f651e32451e98"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const esc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nameOf = s => String(s||'').split(' · ')[0];
+const phoneOf = s => { const p=String(s||'').split(' · '); return p.length>1?p[p.length-1]:''; };
+const money = n => 'GH₵ ' + (Math.round(n*100)/100);
+const NAV = ['home','deliveries','earnings','profile'];
+let me=null, avail=[], mine=[], dTab='on', selId=null, editMode='p', splashDone=false, authState='wait';
+
+function store(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){} return null; }
+function declined(){ try{ return JSON.parse(store('ks_dec')||'[]'); }catch(e){ return []; } }
+function setErr(m){ ['lErr','rErr'].forEach(i=>{ $(i).textContent=m; $(i).style.display=m?'block':'none'; }); }
+function authMsg(c){return ({'auth/email-already-in-use':'That email is already registered.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'That email address is not valid.','auth/invalid-credential':'Wrong email or password.','auth/network-request-failed':'No internet connection.'})[c] || ('Something went wrong ('+c+').')}
+const tsOf = o => (o.createdAt && o.createdAt.seconds) || 0;
+const dsec = o => (o.deliveredAt && o.deliveredAt.seconds) || 0;
+function ago(sec){ if(!sec) return 'just now'; const m=Math.max(0,Math.round((Date.now()/1000-sec)/60)); if(m<1) return 'just now'; if(m<60) return m+' mins ago'; if(m<1440) return Math.round(m/60)+' hrs ago'; return Math.round(m/1440)+' days ago'; }
+
+window.go = (id,arg) => {
+  if(id!=='ongoing') stopMap();
+  if(id==='deliveries' && arg) dTab = arg;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $(id).classList.add('on');
+  $('nav').classList.toggle('on', NAV.includes(id));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.t===id));
+  if(me) paint(id);
+  window.scrollTo(0,0);
+};
+function paint(id){
+  const f = {home:pHome,request:pRequest,ongoing:pOngoing,deliveries:pDeliveries,earnings:pEarnings,statement:pStatement,profile:pProfile,notifs:pNotifs,settings:pSettings,docs:pDocs}[id];
+  if(f) f();
+}
+function cur(){ return document.querySelector('.screen.on').id; }
+
+/* ---------- auth ---------- */
+window.doLogin = async () => {
+  const e=$('lEmail').value.trim(), p=$('lPass').value;
+  if(!e||!p) return setErr('Enter your email and password.');
+  try{ setErr(''); await signInWithEmailAndPassword(auth,e,p); }catch(err){ setErr(authMsg(err.code)); }
+};
+window.doRegister = async () => {
+  const n=$('rName').value.trim(), ph=$('rPhone').value.trim(), e=$('rEmail').value.trim(), p=$('rPass').value, pl=$('rPlate').value.trim();
+  if(!n||!ph||!e||!p||!pl) return setErr('Fill in every field.');
+  try{
+    setErr('');
+    const c = await createUserWithEmailAndPassword(auth,e,p);
+    await updateProfile(c.user,{displayName:n});
+    await setDoc(doc(db,'users',c.user.uid),{name:n,phone:ph,email:e,role:'rider',approved:false,bike:$('rBike').value,plate:pl,online:false,createdAt:serverTimestamp()});
+  }catch(err){ setErr(authMsg(err.code)); }
+};
+window.forgot = async () => {
+  const e=$('lEmail').value.trim();
+  if(!e) return setErr('Type your email above first, then tap Forgot password.');
+  try{ await sendPasswordResetEmail(auth,e); alert('Reset link sent. Check your email.'); }catch(err){ setErr(authMsg(err.code)); }
+};
+window.changePw = async () => {
+  try{ await sendPasswordResetEmail(auth,auth.currentUser.email); alert('We sent a password reset link to '+auth.currentUser.email); }catch(e){ alert('Could not send. Check your internet.'); }
+};
+window.logout = () => signOut(auth);
+
+/* ---------- data ---------- */
+async function load(){
+  if(!auth.currentUser) return;
+  const uid = auth.currentUser.uid;
+  const a = await getDocs(query(collection(db,'orders'),where('status','==','Accepted')));
+  const dec = declined();
+  avail = a.docs.map(d=>({id:d.id,...d.data()})).filter(o=>!o.riderId && !dec.includes(o.id)).sort((x,y)=>tsOf(y)-tsOf(x));
+  const m = await getDocs(query(collection(db,'orders'),where('riderId','==',uid)));
+  mine = m.docs.map(d=>({id:d.id,...d.data()})).sort((x,y)=>tsOf(y)-tsOf(x));
+  paint(cur());
+}
+const ongoingL = () => mine.filter(o=>o.status==='Out for delivery');
+const doneL = () => mine.filter(o=>o.status==='Delivered');
+const cancL = () => mine.filter(o=>o.status==='Cancelled');
+const find = id => avail.find(o=>o.id===id) || mine.find(o=>o.id===id);
+const sameDay = (sec,d) => { if(!sec) return false; const t=new Date(sec*1000); return t.toDateString()===d.toDateString(); };
+
+/* ---------- home ---------- */
+function pHome(){
+  const h=new Date().getHours();
+  $('hGreet').textContent = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+  $('hName').textContent = me.name; $('hAv').textContent=(me.name[0]||'?').toUpperCase();
+  const today = doneL().filter(o=>sameDay(dsec(o),new Date())).reduce((a,o)=>a+(Number(o.fee)||0),0);
+  $('hToday').textContent = money(today);
+  $('hNew').textContent = me.online?avail.length:0; $('hOn').textContent=ongoingL().length; $('hDone').textContent=doneL().length; $('hCanc').textContent=cancL().length;
+  $('hTg').classList.toggle('on',!!me.online); $('hOnlineTxt').textContent = me.online?'You are Online':'Go Online';
+  const reqs = me.online?avail:[];
+  $('reqList').innerHTML = !me.online ? '<p class="sub">Go online to see new delivery requests.</p>'
+    : reqs.length ? reqs.map(o=>'<div class="card" onclick="openReq(\''+o.id+'\')"><div class="row"><b>'+esc(o.orderId)+'</b><span class="tag">'+money(o.fee)+'</span></div><small>'+esc(o.pickup)+' → '+esc(o.dropoff)+'</small><small>'+esc(o.package)+'</small></div>').join('') : '<p class="sub">No new requests right now.</p>';
+}
+window.toggleOnline = async () => {
+  me.online = !me.online;
+  try{ await setDoc(doc(db,'users',auth.currentUser.uid),{online:me.online},{merge:true}); }catch(e){ me.online=!me.online; alert('Could not update. Check your internet.'); }
+  pHome();
+};
+
+/* ---------- request / ongoing / done ---------- */
+window.openReq = id => { selId=id; go('request'); };
+window.openOng = id => { selId=id; go('ongoing'); };
+function pRequest0(){
+  const o=find(selId); if(!o){ $('reqBox').innerHTML='<p class="sub">This request is no longer available.</p>'; return; }
+  $('reqBox').innerHTML =
+   '<div class="card"><div class="row"><b>Order '+esc(o.orderId)+'</b><span class="tag y">Pickup</span></div>'+
+   '<small>Sender</small><b>'+esc(nameOf(o.sender))+'</b><small>'+esc(phoneOf(o.sender))+'</small><small>📍 '+esc(o.pickup)+'</small></div>'+
+   '<div class="card"><small>Recipient</small><b>'+esc(nameOf(o.recipient))+'</b><small>'+esc(phoneOf(o.recipient))+'</small><small>📍 '+esc(o.dropoff)+'</small></div>'+
+   '<div class="card"><small>Package details</small><b>'+esc(o.package)+'</b></div>'+
+   '<div class="card row"><span>Distance (straight line)</span><b id="reqDist">Calculating...</b></div>'+
+   '<div class="card row"><div><small style="margin:0">Estimated fee</small><b style="font-size:24px;color:var(--g)">'+money(o.fee)+'</b></div><span class="tag">'+esc(o.payment)+'</span></div>'+
+   '<button class="btn" onclick="accept(\''+o.id+'\')">Accept order</button><button class="btn ghost" onclick="decline(\''+o.id+'\')">Decline</button>';
+}
+window.accept = async id => {
+  const ref=doc(db,'orders',id);
+  try{
+    await runTransaction(db, async tx => {
+      const s=await tx.get(ref), d=s.data();
+      if(!d||d.status!=='Accepted'||d.riderId) throw new Error('taken');
+      tx.update(ref,{status:'Out for delivery',riderId:auth.currentUser.uid,riderName:me.name,riderPhone:me.phone,stage:0});
+    });
+    await load(); selId=id; go('ongoing');
+  }catch(e){ alert('Another rider already took this order.'); await load(); go('home'); }
+};
+window.decline = id => { const d=declined(); d.push(id); store('ks_dec',JSON.stringify(d)); load().then(()=>go('home')); };
+window.deliver = async id => {
+  try{
+    await updateDoc(doc(db,'orders',id),{status:'Delivered',deliveredAt:serverTimestamp(),stage:4});
+    const o=find(id); $('dId').textContent='Order #'+(o?o.orderId:''); $('dEarn').textContent=money(o?o.fee:0);
+    await load(); go('done');
+  }catch(e){ alert('Could not update. Check your internet.'); }
+};
+
+/* ---------- deliveries ---------- */
+window.setDT = t => { dTab=t; pDeliveries(); };
+function pDeliveries(){
+  document.querySelectorAll('#dTabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===dTab));
+  const l = dTab==='on'?ongoingL():dTab==='done'?doneL():cancL();
+  const tag = dTab==='on'?'<span class="tag y">In progress</span>':dTab==='done'?'<span class="tag">Delivered</span>':'<span class="tag r">Cancelled</span>';
+  $('dList').innerHTML = l.length ? l.map(o=>'<div class="card" '+(dTab==='on'?'onclick="openOng(\''+o.id+'\')"':'')+'><div class="row"><b>#'+esc(o.orderId)+'</b>'+tag+'</div><small>'+esc(o.pickup)+' → '+esc(o.dropoff)+'</small><small>'+money(o.fee)+'</small></div>').join('') : '<p class="sub">Nothing here yet.</p>';
+}
+
+/* ---------- earnings ---------- */
+function pEarnings(){
+  const d=doneL(), total=d.reduce((a,o)=>a+(Number(o.fee)||0),0);
+  const today=d.filter(o=>sameDay(dsec(o),new Date())).reduce((a,o)=>a+(Number(o.fee)||0),0);
+  $('eTotal').textContent=money(total); $('eToday').textContent=money(today); $('eCount').textContent=d.length;
+  const now=new Date(), mon=new Date(now); mon.setHours(0,0,0,0); mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  const names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], vals=names.map((n,i)=>{ const day=new Date(mon); day.setDate(mon.getDate()+i); return d.filter(o=>sameDay(dsec(o),day)).reduce((a,o)=>a+(Number(o.fee)||0),0); });
+  const mx=Math.max(1,...vals);
+  $('eChart').innerHTML = vals.map((v,i)=>'<div><i style="height:'+Math.round(v/mx*85)+'px"></i>'+names[i]+'</div>').join('');
+}
+function pStatement(){
+  const d=doneL();
+  $('stList').innerHTML = d.length ? d.map(o=>'<div class="card"><div class="row"><b>#'+esc(o.orderId)+'</b><b style="color:var(--g)">+'+money(o.fee)+'</b></div><small>'+esc(o.pickup)+' → '+esc(o.dropoff)+'</small><small>'+(dsec(o)?new Date(dsec(o)*1000).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'')+'</small></div>').join('') : '<p class="sub">No completed deliveries yet.</p>';
+}
+
+/* ---------- profile / edit / notifications / settings ---------- */
+function pProfile(){
+  $('pAv').textContent=(me.name[0]||'?').toUpperCase(); $('pName').textContent=me.name;
+  $('pTag').textContent=me.online?'Online':'Offline'; $('pTag').className='tag'+(me.online?'':' off');
+  $('pPhone').textContent=me.phone; $('pEmail').textContent=me.email; $('pBike').textContent=me.bike; $('pPlate').textContent=me.plate;
+}
+window.openEdit = m => {
+  editMode=m;
+  $('eTitle').textContent = m==='p'?'Edit Profile':'Vehicle Information';
+  $('eFields').innerHTML = m==='p'
+    ? '<input id="f1" placeholder="Full name" value="'+esc(me.name)+'"><input id="f2" type="tel" placeholder="Phone number" value="'+esc(me.phone)+'">'
+    : '<select id="f1">'+['Motorcycle','Bicycle','Car / Van'].map(x=>'<option'+(x===me.bike?' selected':'')+'>'+x+'</option>').join('')+'</select><input id="f2" placeholder="License plate number" value="'+esc(me.plate)+'">';
+  go('editp');
+};
+window.saveEdit = async () => {
+  const a=$('f1').value.trim(), b=$('f2').value.trim();
+  if(!a||!b) return alert('Fill in both fields.');
+  const d = editMode==='p' ? {name:a,phone:b} : {bike:a,plate:b};
+  try{
+    await setDoc(doc(db,'users',auth.currentUser.uid),d,{merge:true});
+    Object.assign(me,d);
+    if(editMode==='p') await updateProfile(auth.currentUser,{displayName:a});
+    go('profile');
+  }catch(e){ alert('Could not save. Check your internet.'); }
+};
+function pNotifs(){
+  const items=[];
+  if(me.online) avail.forEach(o=>items.push({t:'New delivery request',s:'Order #'+o.orderId,sec:tsOf(o)}));
+  doneL().forEach(o=>{ items.push({t:'Delivery completed',s:'Order #'+o.orderId,sec:dsec(o)}); items.push({t:'Payment received',s:money(o.fee),sec:dsec(o)}); });
+  cancL().forEach(o=>items.push({t:'Order cancelled',s:'Order #'+o.orderId,sec:tsOf(o)}));
+  items.sort((a,b)=>b.sec-a.sec);
+  $('nList').innerHTML = items.length ? items.map(i=>'<div class="card"><b>'+esc(i.t)+'</b><small>'+esc(i.s)+'</small><small>'+ago(i.sec)+'</small></div>').join('') : '<p class="sub">No notifications yet.</p>';
+}
+function pSettings(){ document.querySelectorAll('.tgd').forEach(b=>b.classList.toggle('on', store('ks_'+b.dataset.k)!=='0')); }
+window.tgl = b => { const on=!b.classList.contains('on'); b.classList.toggle('on',on); store('ks_'+b.dataset.k,on?'1':'0'); };
+
+
+/* ---------- map, distance, stages ---------- */
+let map=null, myMarker=null, watchId=null, completing=false, lastSend=0;
+const geoCache={};
+const icon = e => L.divIcon({html:'<div style="font-size:26px">'+e+'</div>',className:'',iconSize:[26,26],iconAnchor:[13,22]});
+async function geocode(addr){
+  const k=addr.toLowerCase();
+  if(geoCache[k]!==undefined) return geoCache[k];
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=gh&q='+encodeURIComponent(addr));
+    const j=await r.json(); geoCache[k]=j[0]?[+j[0].lat,+j[0].lon]:null;
+  }catch(e){ geoCache[k]=null; }
+  return geoCache[k];
+}
+function km(a,b){
+  const R=6371, rad=x=>x*Math.PI/180, dLa=rad(b[0]-a[0]), dLo=rad(b[1]-a[1]);
+  const h=Math.sin(dLa/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+async function calcDist(o){
+  const a=await geocode(o.pickup+', Ghana'), b=await geocode(o.dropoff+', Ghana'), el=$('reqDist');
+  if(el) el.textContent = (a&&b) ? '≈ '+km(a,b).toFixed(1)+' km' : 'Not available';
+}
+function pRequest(){ pRequest0(); const o=find(selId); if(o) calcDist(o); }
+function stopMap(){
+  if(watchId!==null && navigator.geolocation){ navigator.geolocation.clearWatch(watchId); }
+  watchId=null; myMarker=null;
+  if(map){ map.remove(); map=null; }
+}
+function startGps(){
+  if(!navigator.geolocation) return;
+  watchId = navigator.geolocation.watchPosition(p=>{
+    if(!map) return;
+    const ll=[p.coords.latitude,p.coords.longitude];
+    if(Date.now()-lastSend>15000){ const od=find(selId); if(od && od.status==='Out for delivery'){ lastSend=Date.now(); updateDoc(doc(db,'orders',od.id),{riderLoc:{lat:ll[0],lng:ll[1]}}).catch(()=>{}); } }
+    if(!myMarker) myMarker=L.marker(ll,{icon:icon('🏍️')}).addTo(map); else myMarker.setLatLng(ll);
+  },()=>{},{enableHighAccuracy:true,maximumAge:10000});
+}
+async function drawMap(o){
+  const box=$('lmap');
+  if(typeof L==='undefined'){ box.innerHTML='<p class="sub" style="padding:14px">Map could not load. Check your internet.</p>'; $('distTxt').textContent=''; return; }
+  stopMap();
+  const m = map = L.map('lmap').setView([5.6037,-0.1870],11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
+  startGps();
+  const a=await geocode(o.pickup+', Ghana'); if(map!==m) return;
+  const b=await geocode(o.dropoff+', Ghana'); if(map!==m) return;
+  const pts=[];
+  if(a){ L.marker(a,{icon:icon('📍')}).addTo(m).bindPopup('Pickup'); pts.push(a); }
+  if(b){ L.marker(b,{icon:icon('🏁')}).addTo(m).bindPopup('Drop-off'); pts.push(b); }
+  if(a&&b) L.polyline([a,b],{color:'#2a7de1',weight:4,dashArray:'6'}).addTo(m);
+  if(pts.length) m.fitBounds(pts,{padding:[30,30],maxZoom:15});
+  $('distTxt').textContent = (a&&b) ? '≈ '+km(a,b).toFixed(1)+' km (straight line). Tap Navigate for road directions.' : 'Could not find one of the addresses on the map.';
+}
+function pOngoing(){
+  const o=find(selId); if(!o){ $('ongBox').innerHTML='<p class="sub">Order not found.</p>'; return; }
+  const st = o.status==='Delivered' ? 4 : (Number(o.stage)||0);
+  const names=['Picked up','On way','Arrived','Delivered'];
+  const nxt=['Confirm pickup','Start delivery (on the way)','I have arrived','Mark as delivered'][st];
+  const tel=phoneOf(o.recipient).replace(/[^+\d]/g,''), q=encodeURIComponent(o.dropoff+', Ghana');
+  $('ongBox').innerHTML =
+   '<div class="row"><b style="font-size:18px">#'+esc(o.orderId)+'</b><span class="tag '+(st===4?'':'y')+'">'+(st===0?'Accepted':names[st-1])+'</span></div>'+
+   '<div id="lmap"></div><p class="sub c" id="distTxt" style="margin:0 0 8px">Loading map...</p>'+
+   '<div class="steps">'+names.map((n,i)=>'<div class="'+(st>i?'on':'')+'"><i>'+(i+1)+'</i>'+n+'</div>').join('')+'</div>'+
+   '<div class="card"><small style="margin:0">Customer contact</small><b>'+esc(nameOf(o.recipient))+'</b><small>'+esc(phoneOf(o.recipient))+'</small><small>📍 '+esc(o.dropoff)+'</small></div>'+
+   (o.status==='Out for delivery'?'<button class="btn" onclick="nextStage(\''+o.id+'\')">'+nxt+'</button>':'')+
+   '<a class="btn ghost" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination='+q+'">Navigate</a>'+
+   (tel?'<a class="btn ghost" href="tel:'+esc(tel)+'">📞 Call recipient</a>':'');
+  drawMap(o);
+}
+window.nextStage = async id => {
+  const o=find(id), s=Number(o.stage)||0;
+  if(s>=3) return window.deliver(id);
+  try{ await updateDoc(doc(db,'orders',id),{stage:s+1}); o.stage=s+1; pOngoing(); }
+  catch(e){ alert('Could not update. Check your internet.'); }
+};
+
+/* ---------- google sign-in for riders ---------- */
+window.googleLogin = async () => {
+  try{ setErr(''); completing=true; await signInWithPopup(auth,new GoogleAuthProvider()); }
+  catch(err){ completing=false; setErr(authMsg(err.code)); }
+};
+window.completeProfile = async () => {
+  const ph=$('cPhone').value.trim(), pl=$('cPlate').value.trim(), u=auth.currentUser;
+  if(!ph||!pl) return alert('Fill in every field.');
+  try{
+    await setDoc(doc(db,'users',u.uid),{name:u.displayName||'Rider',phone:ph,email:u.email,role:'rider',approved:false,bike:$('cBike').value,plate:pl,online:false,createdAt:serverTimestamp()});
+    completing=false; await signOut(auth); setErr('Account created. It is waiting for admin approval.'); go('login');
+  }catch(e){ alert('Could not save. Check your internet.'); }
+};
+window.cancelComplete = async () => { completing=false; await signOut(auth); go('login'); };
+
+/* ---------- documents ---------- */
+const DOCS=[['license',"Driver's license"],['card','Ghana Card'],['reg','Vehicle registration']];
+function pDocs(){
+  $('docList').innerHTML = DOCS.map(d=>{
+    const has = !!me['doc_'+d[0]];
+    return '<div class="card"><div class="row"><b>'+d[1]+'</b><span class="tag'+(has?'':' off')+'">'+(has?'Uploaded':'Not uploaded')+'</span></div>'+
+      '<label class="btn ghost" style="margin-top:8px">'+(has?'Replace photo':'Upload photo')+'<input type="file" accept="image/*" style="display:none" onchange="uploadDoc(\''+d[0]+'\',this)"></label></div>';
+  }).join('');
+}
+window.uploadDoc = (k,inp) => {
+  const f=inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ const img=new Image(); img.onload=async()=>{
+    const sc=Math.min(1,800/Math.max(img.width,img.height)), c=document.createElement('canvas');
+    c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const data=c.toDataURL('image/jpeg',0.55);
+    if(data.length>250000) return alert('Photo is too detailed. Try again from a bit further away.');
+    try{ await setDoc(doc(db,'users',auth.currentUser.uid),{['doc_'+k]:data},{merge:true}); me['doc_'+k]=data; pDocs(); }
+    catch(e){ alert('Could not upload. Check your internet.'); }
+  }; img.src=r.result; };
+  r.readAsDataURL(f);
+};
+
+/* ---------- routing ---------- */
+function route(){
+  if(!splashDone || authState==='wait' || authState==='pending') return;
+  const c=cur();
+  if(authState==='out'){ if(c==='splash' || !['login','register'].includes(c)) go('login'); }
+  else if(['splash','login','register'].includes(c)) go('home');
+}
+setTimeout(()=>{ splashDone=true; route(); },1800);
+setInterval(()=>{ if(me && ['home','deliveries','notifs'].includes(cur())) load(); },20000);
+
+onAuthStateChanged(auth, async u => {
+  if(!u){ me=null; authState='out'; route(); return; }
+  try{
+    let r = await getDoc(doc(db,'users',u.uid));
+    for(let i=0;i<5 && !r.exists() && !completing;i++){ await new Promise(x=>setTimeout(x,400)); r = await getDoc(doc(db,'users',u.uid)); }
+    if(!r.exists() && completing){ authState='pending'; go('complete'); return; }
+    if(!r.exists() || r.data().role!=='rider'){ authState='out'; await signOut(auth); setErr('This account is not a rider account.'); return; }
+    if(r.data().approved!==true){ authState='out'; await signOut(auth); setErr('Your account is waiting for admin approval.'); go('login'); return; }
+    me=r.data(); authState='in';
+    await load(); route();
+  }catch(e){ authState='out'; setErr('Could not load. Check your internet.'); route(); }
+});
+</script>
+</body>
+</html>
