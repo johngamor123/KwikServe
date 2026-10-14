@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KwikServe</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--g:#0b6b2e;--gd:#07501f;--y:#f5c518;--bg:#f6f8f6;--t:#14211a;--m:#6b7a70;--line:#e2e8e3}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:var(--bg);color:var(--t);max-width:480px;margin:0 auto;min-height:100vh}
+.screen{display:none;min-height:100vh;padding:20px 18px 90px}
+.screen.on{display:block}
+#splash{background:var(--g);color:#fff;text-align:center;padding-top:30vh}
+#splash h1{font-size:44px;letter-spacing:-1px}
+#splash h1 span{color:var(--y)}
+#splash p{margin-top:12px;opacity:.9}
+.logo{font-size:30px;font-weight:800;color:var(--g);text-align:center;margin:20px 0 6px}
+.logo span{color:var(--y)}
+h2{font-size:24px;margin:16px 0 4px}
+.sub{color:var(--m);font-size:14px;margin-bottom:18px}
+input,select{width:100%;padding:14px;border:1px solid var(--line);border-radius:10px;font-size:15px;margin-bottom:12px;background:#fff}
+input:focus,select:focus{outline:2px solid var(--g);border-color:var(--g)}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:10px;background:var(--g);color:#fff;font-size:16px;font-weight:700;margin-top:6px}
+.btn:active{background:var(--gd)}
+.link{color:var(--g);font-weight:600;text-decoration:none;cursor:pointer}
+.center{text-align:center;font-size:14px;color:var(--m);margin-top:16px}
+.tabs{display:flex;background:#e9eee9;border-radius:10px;padding:4px;margin-bottom:16px}
+.tabs button{flex:1;padding:10px;border:0;border-radius:8px;background:none;font-weight:600;color:var(--m)}
+.tabs button.on{background:var(--g);color:#fff}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:14px;font-weight:600}
+.hero{background:var(--g);color:#fff;border-radius:16px;padding:20px;margin-bottom:16px}
+.hero h3{font-size:22px;margin-bottom:6px}
+.hero p{font-size:13px;opacity:.9}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 10px;text-align:center;font-weight:600;font-size:14px}
+.tile i{display:block;font-style:normal;font-size:30px;margin-bottom:8px}
+.row{display:flex;justify-content:space-between;align-items:center;margin:8px 0 10px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.card b{display:block}
+.card small{color:var(--m)}
+.tag{background:#dff3e5;color:var(--g);font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--line);display:none;justify-content:space-around;padding:8px 0 12px}
+nav.on{display:flex}
+nav button{border:0;background:none;color:var(--m);font-size:12px;font-weight:600}
+nav button i{display:block;font-style:normal;font-size:22px}
+nav button.on{color:var(--g)}
+.back{border:0;background:none;font-size:15px;font-weight:600;color:var(--t);margin-bottom:6px}
+.steps{display:flex;gap:8px;margin:10px 0 16px}
+.steps div{flex:1;height:5px;border-radius:5px;background:var(--line)}
+.steps .on{background:var(--g)}
+.err{color:#c0392b;font-size:13px;margin-bottom:10px;display:none}
+.pay{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;font-weight:600}
+.pay.on{border-color:var(--g);background:#eef8f1}
+.dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--m)}
+.pay.on .dot{border-color:var(--g);background:radial-gradient(var(--g) 45%,#fff 50%)}
+.map{height:220px;border-radius:16px;margin:12px 0;background:linear-gradient(135deg,#dfeee3,#cfe3d5);position:relative;overflow:hidden}
+.map:before{content:"";position:absolute;left:12%;top:70%;width:70%;height:4px;background:#2a7de1;transform:rotate(-28deg);transform-origin:left}
+.map span{position:absolute;font-size:28px}
+.ghost{background:#fff;color:var(--g);border:2px solid var(--g)}
+.two{display:flex;gap:10px}
+.sum small{display:block;margin-top:10px}
+.sum small:first-child{margin-top:0}
+.gbtn{background:#fff;color:var(--t);border:1px solid var(--line)}
+.or{text-align:center;color:var(--m);font-size:13px;margin:14px 0}
+.big{font-size:90px;text-align:center;margin:30px 0 10px}
+.av{width:56px;height:56px;border-radius:50%;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
+.item{display:flex;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:10px;font-weight:600}
+.item span{color:var(--m)}
+#tmap{height:220px;border-radius:16px;margin:12px 0;z-index:0}
+.prog{display:flex;justify-content:space-between;margin:12px 0;font-size:11px;color:var(--m);text-align:center}
+.prog div{flex:1}.prog i{display:block;width:26px;height:26px;border-radius:50%;background:var(--line);margin:0 auto 4px;line-height:26px;font-style:normal;color:#fff;font-weight:700}
+.prog .on{color:var(--g);font-weight:700}.prog .on i{background:var(--g)}
+</style>
+</head>
+<body>
+
+<!-- 1. Splash -->
+<section class="screen on" id="splash">
+  <h1>Kwik<span>Serve</span></h1>
+  <p>Fast and reliable parcel<br>delivery across Ghana.</p>
+</section>
+
+<!-- 2. Login -->
+<section class="screen" id="login">
+  <div class="logo">Kwik<span>Serve</span></div>
+  <h2>Welcome back</h2>
+  <p class="sub">Log in to your account</p>
+  <input id="lEmail" placeholder="Email address">
+  <input id="lPass" type="password" placeholder="Password">
+  <p style="text-align:right;margin:-4px 0 12px;font-size:13px"><a class="link" onclick="go('forgot')">Forgot password?</a></p>
+  <div class="err" id="lErr">Enter your email and password.</div>
+  <button class="btn" onclick="doLogin()">Login</button>
+  <p class="or">OR</p>
+  <button class="btn gbtn" onclick="googleLogin()">Continue with Google</button>
+  <p class="center">Don't have an account? <a class="link" onclick="go('register')">Register</a></p>
+</section>
+
+<!-- 3. Register -->
+<section class="screen" id="register">
+  <button class="back" onclick="go('login')">← Back</button>
+  <h2>Create account</h2>
+  <div class="tabs"><button class="on">Customer</button><button onclick="alert('Rider sign-up comes in a later step.')">Rider</button></div>
+  <input id="rName" placeholder="Full name">
+  <input id="rPhone" type="tel" placeholder="Phone number">
+  <input id="rEmail" type="email" placeholder="Email address">
+  <input id="rPass" type="password" placeholder="Password">
+  <div class="err" id="rErr">Fill in every field.</div>
+  <button class="btn" onclick="doRegister()">Register</button>
+  <p class="center" style="font-size:12px">By creating an account, you agree to our Terms &amp; Conditions and Privacy Policy.</p>
+  <p class="center">Already registered? <a class="link" onclick="go('login')">Login</a></p>
+</section>
+
+<!-- 4. Dashboard -->
+<section class="screen" id="home">
+  <div class="top"><span>📍 Accra, Ghana</span><span>🔔</span></div>
+  <div class="hero"><h3>Quick delivery made easy</h3><p>Send parcels and documents. Fast, safe, reliable.</p></div>
+  <div class="grid">
+    <div class="tile" onclick="go('send')"><i>✈️</i>Send package</div>
+    <div class="tile" onclick="go('deliveries')"><i>📦</i>My deliveries</div>
+    <div class="tile" onclick="trackLatest()"><i>📍</i>Track order</div>
+    <div class="tile" onclick="go('account')"><i>👤</i>Account</div>
+  </div>
+  <div class="row"><b>Recent deliveries</b><span class="link" onclick="go('deliveries')">See all</span></div>
+  <div id="recent"></div>
+</section>
+
+<!-- 5. Send package -->
+<section class="screen" id="send">
+  <button class="back" onclick="go('home')">← Send package</button>
+  <div class="steps"><div class="on"></div><div></div><div></div></div>
+  <h2>Package details</h2>
+  <p class="sub">Step 1 of 3</p>
+  <input id="sName" placeholder="Sender name">
+  <input id="sPhone" type="tel" placeholder="Sender phone">
+  <input id="sPick" placeholder="Pickup address">
+  <input id="dName" placeholder="Recipient name">
+  <input id="dPhone" type="tel" placeholder="Recipient phone">
+  <input id="dDrop" placeholder="Drop-off address">
+  <select id="pType"><option>Documents</option><option>Small parcel</option><option>Food</option><option>Other</option></select>
+  <input id="pWeight" type="number" placeholder="Weight (kg)">
+  <div class="err" id="sErr">Fill in every field.</div>
+  <button class="btn" onclick="getEstimate()">Get estimate</button>
+</section>
+
+<!-- 6. Deliveries -->
+<section class="screen" id="deliveries">
+  <h2>My deliveries</h2>
+  <div class="tabs" id="dTabs" style="margin-top:12px">
+    <button class="on" onclick="filterDel('all',this)">All</button>
+    <button onclick="filterDel('progress',this)">In progress</button>
+    <button onclick="filterDel('done',this)">Delivered</button>
+  </div>
+  <div id="dList"></div>
+</section>
+
+<!-- 7. Account -->
+<section class="screen" id="account">
+  <div class="row" style="justify-content:flex-start;gap:14px;margin-bottom:18px"><div class="av">J</div><div><h2 id="aName" style="margin:0">John Doe</h2><p class="sub" id="aPhone" style="margin:0">024 123 4567</p></div></div>
+  <div class="item" onclick="openPage('edit')">Edit profile<span>›</span></div>
+  <div class="item" onclick="openPage('addr')">Saved addresses<span>›</span></div>
+  <div class="item" onclick="openPage('payments')">Payment methods<span>›</span></div>
+  <div class="item" onclick="openPage('help')">Help &amp; support<span>›</span></div>
+  <div class="item" onclick="openPage('settings')">Settings<span>›</span></div>
+  <button class="btn" style="background:#c0392b;margin-top:14px" onclick="logout()">Log out</button>
+</section>
+
+<!-- 8. Estimate -->
+<section class="screen" id="estimate">
+  <button class="back" onclick="go('send')">← Delivery estimate</button>
+  <div class="steps"><div class="on"></div><div class="on"></div><div></div></div>
+  <div class="hero"><p>Estimated fee</p><h3 style="font-size:36px">GH₵ 25</h3><p>Fixed rate for this route</p></div>
+  <div class="card sum"><small>Pickup</small><b id="ePick"></b><small>Drop-off</small><b id="eDrop"></b><small>Package</small><b id="ePkg"></b></div>
+  <button class="btn" onclick="go('confirm')">Confirm &amp; continue</button>
+</section>
+
+<!-- 9. Confirm order -->
+<section class="screen" id="confirm">
+  <button class="back" onclick="go('estimate')">← Confirm order</button>
+  <div class="steps"><div class="on"></div><div class="on"></div><div class="on"></div></div>
+  <div class="card sum">
+    <small>Sender</small><b id="cSender"></b>
+    <small>Recipient</small><b id="cRec"></b>
+    <small>Pickup</small><b id="cPick"></b>
+    <small>Drop-off</small><b id="cDrop"></b>
+    <small>Package</small><b id="cPkg"></b>
+  </div>
+  <div class="card row" style="background:#eef8f1"><b>Total fee</b><b>GH₵ 25</b></div>
+  <button class="btn" onclick="go('pay')">Continue to payment</button>
+</section>
+
+<!-- 10. Payment -->
+<section class="screen" id="pay">
+  <button class="back" onclick="go('confirm')">← Payment</button>
+  <h2>Select payment method</h2>
+  <p class="sub">Tap one to choose</p>
+  <div class="pay on" onclick="pickPay(this)"><span class="dot"></span>MTN Mobile Money</div>
+  <div class="pay" onclick="pickPay(this)"><span class="dot"></span>Telecel Cash</div>
+  <div class="pay" onclick="pickPay(this)"><span class="dot"></span>AirtelTigo Money</div>
+  <div class="pay" onclick="pickPay(this)"><span class="dot"></span>Cash on delivery</div>
+  <p class="sub">Mobile money payments are not live yet. This step only saves your choice for now.</p>
+  <button class="btn" onclick="placeOrder()">Pay &amp; place order</button>
+</section>
+
+<!-- 11. Track order -->
+<section class="screen" id="track">
+  <button class="back" onclick="go('home')">← Track order</button>
+  <div class="row"><h2 id="tId" style="margin:0"></h2><span class="tag" id="tTag"></span></div>
+  <p class="sub" id="tSub">Loading...</p>
+  <div id="tmap"></div>
+  <div class="prog" id="tProg"></div>
+  <div class="card" id="tRider"></div>
+</section>
+
+<!-- Welcome -->
+<section class="screen" id="welcome" style="text-align:center">
+  <div class="logo">Kwik<span>Serve</span></div>
+  <div class="big">🏍️</div>
+  <h2>Send, track, receive</h2>
+  <p class="sub">Your trusted delivery partner in Ghana. Fast, safe and reliable.</p>
+  <button class="btn" onclick="go('register')">Get started</button>
+  <p class="center">Already have an account? <a class="link" onclick="go('login')">Login</a></p>
+</section>
+
+<!-- Forgot password -->
+<section class="screen" id="forgot">
+  <button class="back" onclick="go('login')">← Back</button>
+  <h2>Reset password</h2>
+  <p class="sub">Enter your email and we will send a reset link.</p>
+  <input id="fEmail" type="email" placeholder="Email address">
+  <button class="btn" onclick="sendReset()">Send reset link</button>
+</section>
+
+<!-- Account sub-pages -->
+<section class="screen" id="page">
+  <button class="back" onclick="go('account')">← Back</button>
+  <h2 id="pTitle"></h2>
+  <div id="pBody" style="margin-top:14px"></div>
+</section>
+
+<nav id="nav">
+  <button data-go="home" class="on" onclick="go('home')"><i>🏠</i>Home</button>
+  <button data-go="deliveries" onclick="go('deliveries')"><i>📦</i>Deliveries</button>
+  <button data-go="account" onclick="go('account')"><i>👤</i>Account</button>
+</nav>
+
+<script>
+var noNav = ['splash','welcome','forgot','page','login','register','send','estimate','confirm','pay','track'];
+function go(id){
+  if(window.leaveTrack && id!=='track') leaveTrack();
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('on')});
+  document.getElementById(id).classList.add('on');
+  var nav = document.getElementById('nav');
+  nav.classList.toggle('on', noNav.indexOf(id) === -1);
+  nav.querySelectorAll('button').forEach(function(b){b.classList.toggle('on', b.dataset.go === id)});
+  window.scrollTo(0,0);
+}
+function filled(ids){return ids.every(function(i){return document.getElementById(i).value.trim() !== ''})}
+function doLogin(){
+  var ok = filled(['lEmail','lPass']);
+  document.getElementById('lErr').style.display = ok ? 'none' : 'block';
+  if(ok) go('home');
+}
+function doRegister(){
+  var ok = filled(['rName','rPhone','rEmail','rPass']);
+  document.getElementById('rErr').style.display = ok ? 'none' : 'block';
+  if(!ok) return;
+  document.getElementById('aName').textContent = document.getElementById('rName').value;
+  document.getElementById('aPhone').textContent = document.getElementById('rPhone').value;
+  go('home');
+}
+function getEstimate(){
+  var ok = filled(['sName','sPhone','sPick','dName','dPhone','dDrop','pWeight']);
+  document.getElementById('sErr').style.display = ok ? 'none' : 'block';
+  if(!ok) return;
+  var pkg = document.getElementById('pType').value + ' (' + document.getElementById('pWeight').value + 'kg)';
+  var pick = document.getElementById('sPick').value, drop = document.getElementById('dDrop').value;
+  var sender = document.getElementById('sName').value + ' · ' + document.getElementById('sPhone').value;
+  var rec = document.getElementById('dName').value + ' · ' + document.getElementById('dPhone').value;
+  set('ePick',pick); set('eDrop',drop); set('ePkg',pkg);
+  set('cSender',sender); set('cRec',rec); set('cPick',pick); set('cDrop',drop); set('cPkg',pkg);
+  go('estimate');
+}
+function set(id,t){document.getElementById(id).textContent = t}
+function pickPay(el){
+  document.querySelectorAll('.pay').forEach(function(p){p.classList.remove('on')});
+  el.classList.add('on');
+}
+function placeOrder(){
+  set('tId','KWK-' + Math.floor(100000 + Math.random()*900000));
+  go('track');
+}
+function filterDel(t,b){
+  document.querySelectorAll('#dTabs button').forEach(function(x){x.classList.remove('on')});
+  b.classList.add('on');
+  document.querySelectorAll('.d').forEach(function(c){c.style.display = (t==='all'||c.dataset.s===t) ? 'block' : 'none'});
+}
+function sendReset(){
+  if(!document.getElementById('fEmail').value.trim()){alert('Enter your email first.');return}
+  alert('Password reset works once we connect the database.');
+  go('login');
+}
+var pages = {
+  edit:['Edit profile','<input id="eName" placeholder="Full name"><input id="ePh" placeholder="Phone number"><input placeholder="Email address"><button class="btn" onclick="saveProfile()">Save changes</button>'],
+  addr:['Saved addresses','<div class="item">Home · Dansoman, Accra</div><div class="item">Work · Tema, Greater Accra</div><button class="btn" onclick="alert(\'Adding addresses comes with the database.\')">Add address</button>'],
+  payments:['Payment methods','<div class="item">MTN Mobile Money<span>Default</span></div><div class="item">Telecel Cash</div><div class="item">Cash on delivery</div>'],
+  help:['Help & support','<div class="item">How do I track my order?<span>›</span></div><div class="item">Payment problems<span>›</span></div><div class="item">Contact support<span>›</span></div>'],
+  settings:['Settings','<div class="item">Language<span>English</span></div><div class="item">Notifications<span>On</span></div><div class="item">About KwikServe<span>v1.0.0</span></div>']
+};
+function openPage(k){
+  set('pTitle',pages[k][0]);
+  document.getElementById('pBody').innerHTML = pages[k][1];
+  go('page');
+}
+function saveProfile(){
+  var n=document.getElementById('eName').value.trim(), p=document.getElementById('ePh').value.trim();
+  if(n) set('aName',n);
+  if(p) set('aPhone',p);
+  go('account');
+}
+function logout(){go('login')}
+setTimeout(function(){go(window.loggedIn ? 'home' : 'welcome')}, 2000);
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signInWithPopup,GoogleAuthProvider,sendPasswordResetEmail,signOut,onAuthStateChanged,updateProfile} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,setDoc,getDoc,addDoc,collection,query,where,getDocs,onSnapshot,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyB2PwMANFFwt8Q1Lr3que1MmMfNFJM1fCs",
+  authDomain: "kwikserve-b381d.firebaseapp.com",
+  projectId: "kwikserve-b381d",
+  storageBucket: "kwikserve-b381d.firebasestorage.app",
+  messagingSenderId: "708250783049",
+  appId: "1:708250783049:web:a47018811f651e32451e98"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const $ = id => document.getElementById(id);
+let orders = [];
+
+function showErr(id,msg){const e=$(id);e.textContent=msg;e.style.display='block'}
+function authMsg(c){return ({
+  'auth/email-already-in-use':'That email is already registered. Try logging in.',
+  'auth/weak-password':'Password must be at least 6 characters.',
+  'auth/invalid-email':'That email address is not valid.',
+  'auth/invalid-credential':'Wrong email or password.',
+  'auth/missing-password':'Enter your password.',
+  'auth/network-request-failed':'No internet connection.',
+  'auth/popup-closed-by-user':'Google sign-in was cancelled.',
+  'auth/unauthorized-domain':'This web address is not allowed in Firebase yet.'
+})[c] || ('Something went wrong ('+c+').')}
+function esc(t){return String(t||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fill(name,phone){
+  $('aName').textContent = name; $('aPhone').textContent = phone;
+  document.querySelector('.av').textContent = (name[0]||'?').toUpperCase();
+}
+
+window.doRegister = async () => {
+  const n=$('rName').value.trim(), p=$('rPhone').value.trim(), e=$('rEmail').value.trim(), pw=$('rPass').value;
+  if(!n||!p||!e||!pw) return showErr('rErr','Fill in every field.');
+  try{
+    const c = await createUserWithEmailAndPassword(auth,e,pw);
+    await updateProfile(c.user,{displayName:n});
+    await setDoc(doc(db,'users',c.user.uid),{name:n,phone:p,email:e,role:'customer',createdAt:serverTimestamp()});
+    $('rErr').style.display='none';
+    fill(n,p); go('home');
+  }catch(err){showErr('rErr',authMsg(err.code))}
+};
+window.doLogin = async () => {
+  const e=$('lEmail').value.trim(), pw=$('lPass').value;
+  if(!e||!pw) return showErr('lErr','Enter your email and password.');
+  try{ await signInWithEmailAndPassword(auth,e,pw); $('lErr').style.display='none'; go('home'); }
+  catch(err){showErr('lErr',authMsg(err.code))}
+};
+window.googleLogin = async () => {
+  try{
+    const c = await signInWithPopup(auth,new GoogleAuthProvider());
+    const r = doc(db,'users',c.user.uid);
+    if(!(await getDoc(r)).exists()) await setDoc(r,{name:c.user.displayName||'',phone:'',email:c.user.email,role:'customer',createdAt:serverTimestamp()});
+    go('home');
+  }catch(err){alert(authMsg(err.code))}
+};
+window.sendReset = async () => {
+  const e=$('fEmail').value.trim();
+  if(!e) return alert('Enter your email first.');
+  try{ await sendPasswordResetEmail(auth,e); alert('Reset link sent. Check your email.'); go('login'); }
+  catch(err){alert(authMsg(err.code))}
+};
+window.logout = async () => { await signOut(auth); go('login'); };
+window.saveProfile = async () => {
+  const u=auth.currentUser; if(!u) return;
+  const n=$('eName').value.trim(), p=$('ePh').value.trim(), d={};
+  if(n) d.name=n; if(p) d.phone=p;
+  try{
+    await setDoc(doc(db,'users',u.uid),d,{merge:true});
+    if(n) await updateProfile(u,{displayName:n});
+    fill(n||$('aName').textContent, p||$('aPhone').textContent); go('account');
+  }catch(e){alert('Could not save. Check your internet.')}
+};
+
+window.placeOrder = async () => {
+  const u=auth.currentUser; if(!u) return alert('Please log in first.');
+  const t = id => $(id).textContent;
+  const id = 'KWK-'+Math.floor(100000+Math.random()*900000);
+  const o = {orderId:id,uid:u.uid,sender:t('cSender'),recipient:t('cRec'),pickup:t('cPick'),dropoff:t('cDrop'),package:t('cPkg'),fee:25,payment:document.querySelector('.pay.on').textContent.trim(),status:'Pending',createdAt:serverTimestamp()};
+  try{ const ref=await addDoc(collection(db,'orders'),o); await loadOrders(); openTrack(ref.id); }
+  catch(e){alert('Could not place order. Check your internet and the Firestore setup.')}
+};
+
+async function loadOrders(){
+  const u=auth.currentUser; if(!u) return;
+  const s = await getDocs(query(collection(db,'orders'),where('uid','==',u.uid)));
+  const ts = x => (x.createdAt && x.createdAt.seconds) || Date.now()/1000;
+  orders = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>ts(b)-ts(a));
+  render();
+}
+function card(o,cls){
+  const done=['Delivered','Completed'].includes(o.status);
+  const dt=(o.createdAt?o.createdAt.toDate():new Date()).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  return '<div class="card '+cls+'" data-s="'+(done?'done':'progress')+'" onclick="openTrack(\''+esc(o.id)+'\')"><div class="row" style="margin:0"><b>'+esc(o.orderId)+'</b><span class="tag">'+esc(o.status)+'</span></div><small>'+esc(o.pickup)+' → '+esc(o.dropoff)+'<br>'+dt+' · GH₵ '+esc(o.fee)+'</small></div>';
+}
+function render(){
+  const empty='<p class="sub">No deliveries yet. Tap Send package to create your first one.</p>';
+  $('dList').innerHTML = orders.length ? orders.map(o=>card(o,'d')).join('') : empty;
+  $('recent').innerHTML = orders.length ? orders.slice(0,3).map(o=>card(o,'')).join('') : empty;
+}
+
+
+/* ---------- real order tracking ---------- */
+let unsub=null, tmap=null, rmark=null;
+const gcache={};
+const icon = e => L.divIcon({html:'<div style="font-size:26px">'+e+'</div>',className:'',iconSize:[26,26],iconAnchor:[13,22]});
+async function geocode(addr){
+  const k=addr.toLowerCase();
+  if(gcache[k]!==undefined) return gcache[k];
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=gh&q='+encodeURIComponent(addr));
+    const j=await r.json(); gcache[k]=j[0]?[+j[0].lat,+j[0].lon]:null;
+  }catch(e){ gcache[k]=null; }
+  return gcache[k];
+}
+window.leaveTrack = () => {
+  if(unsub){ unsub(); unsub=null; }
+  if(tmap){ tmap.remove(); tmap=null; }
+  rmark=null;
+};
+window.openTrack = docId => {
+  leaveTrack(); go('track');
+  $('tId').textContent=''; $('tTag').textContent=''; $('tSub').textContent='Loading...';
+  unsub = onSnapshot(doc(db,'orders',docId), snap => { if(snap.exists()) paintTrack(snap.data()); }, () => { $('tSub').textContent='Could not load this order.'; });
+};
+window.trackLatest = () => {
+  if(!orders.length) return alert('You have no orders yet. Tap Send package to create one.');
+  const a = orders.find(o=>o.status!=='Delivered' && o.status!=='Cancelled') || orders[0];
+  openTrack(a.id);
+};
+async function initTrackMap(o){
+  if(typeof L==='undefined'){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Map could not load.</p>'; return; }
+  const m = tmap = L.map('tmap').setView([5.6037,-0.1870],11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
+  const a=await geocode(o.pickup+', Ghana'); if(tmap!==m) return;
+  const b=await geocode(o.dropoff+', Ghana'); if(tmap!==m) return;
+  const pts=[];
+  if(a){ L.marker(a,{icon:icon('📍')}).addTo(m).bindPopup('Pickup'); pts.push(a); }
+  if(b){ L.marker(b,{icon:icon('🏁')}).addTo(m).bindPopup('Drop-off'); pts.push(b); }
+  if(a&&b) L.polyline([a,b],{color:'#2a7de1',weight:4,dashArray:'6'}).addTo(m);
+  if(pts.length) m.fitBounds(pts,{padding:[30,30],maxZoom:15});
+}
+function paintTrack(o){
+  const delivered = o.status==='Delivered', cancelled = o.status==='Cancelled';
+  const st = Number(o.stage)||0;
+  let head='Waiting for KwikServe to confirm your order', tag='Pending';
+  if(o.status==='Accepted'){ head='Order confirmed. Finding a rider...'; tag='Confirmed'; }
+  if(o.status==='Out for delivery'){ tag='Out for delivery'; head=['Rider is heading to pick up your package','Package picked up','Rider is on the way','Rider has arrived'][st]; }
+  if(delivered){ head='Delivered. Thank you for using KwikServe!'; tag='Delivered'; }
+  if(cancelled){ head='This order was cancelled.'; tag='Cancelled'; }
+  $('tId').textContent=o.orderId; $('tTag').textContent=tag; $('tSub').textContent=head;
+  const on=[o.status!=='Pending'&&!cancelled, !!o.riderId, delivered||(o.status==='Out for delivery'&&st>=1), delivered];
+  $('tProg').innerHTML=['Confirmed','Rider assigned','Picked up','Delivered'].map((n,i)=>'<div class="'+(on[i]?'on':'')+'"><i>'+(i+1)+'</i>'+n+'</div>').join('');
+  const tel=String(o.riderPhone||'').replace(/[^+\d]/g,'');
+  $('tRider').innerHTML = o.riderId
+    ? '<small>Rider</small><b>'+esc(o.riderName)+'</b><small>'+esc(o.riderPhone)+'</small>'+(tel?'<a class="btn" style="margin-top:12px" href="tel:'+esc(tel)+'">📞 Call rider</a>':'')
+    : '<small>Rider</small><b>Not assigned yet</b>';
+  if(!tmap) initTrackMap(o);
+  if(tmap && o.riderLoc && typeof o.riderLoc.lat==='number' && !delivered){
+    const ll=[o.riderLoc.lat,o.riderLoc.lng];
+    if(!rmark) rmark=L.marker(ll,{icon:icon('🏍️')}).addTo(tmap); else rmark.setLatLng(ll);
+  }
+}
+
+onAuthStateChanged(auth, async u => {
+  window.loggedIn = !!u;
+  if(!u){ orders=[]; render(); return; }
+  try{
+    const s = await getDoc(doc(db,'users',u.uid));
+    const d = s.exists()?s.data():{};
+    fill(d.name||u.displayName||'Customer', d.phone||u.email||'');
+    await loadOrders();
+  }catch(e){ console.log(e) }
+  const cur = document.querySelector('.screen.on').id;
+  if(['welcome','login','register','forgot'].includes(cur)) go('home');
+});
+</script>
+
+</body>
+</html>
