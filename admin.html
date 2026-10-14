@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KwikServe Admin</title>
+<style>
+:root{--g:#0b6b2e;--gd:#07501f;--y:#f5c518;--bg:#f6f8f6;--t:#14211a;--m:#6b7a70;--line:#e2e8e3}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:var(--bg);color:var(--t);max-width:560px;margin:0 auto;min-height:100vh;padding-bottom:84px}
+.wrap{padding:16px 18px}
+.logo{font-size:28px;font-weight:800;color:var(--g);text-align:center;margin:30px 0 4px}
+.logo span{color:var(--y)}
+.sub{color:var(--m);font-size:14px;margin-bottom:14px}
+.c{text-align:center}
+input{width:100%;padding:14px;border:1px solid var(--line);border-radius:10px;font-size:15px;margin-bottom:12px;background:#fff}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:10px;background:var(--g);color:#fff;font-size:15px;font-weight:700}
+.err{color:#c0392b;font-size:13px;margin-bottom:10px;display:none}
+.bar{background:var(--g);color:#fff;padding:14px 18px;font-size:18px;font-weight:800}
+.bar span{color:var(--y)}
+h3{font-size:20px;margin-bottom:12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.st{border-radius:14px;padding:14px;color:#fff}
+.st small{display:block;opacity:.9;font-size:12px}.st b{font-size:24px}
+.chips{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px}
+.chips button{border:0;background:#e9eee9;border-radius:20px;padding:8px 14px;font-weight:600;color:var(--m);white-space:nowrap}
+.chips button.on{background:var(--g);color:#fff}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;font-size:14px}
+.row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
+.tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:#dff3e5;color:var(--g);white-space:nowrap}
+.tag.Pending,.tag.wait{background:#fdecc8;color:#8a5a00}
+.tag.Cancelled,.tag.off{background:#eee;color:#666}
+.card small{color:var(--m);display:block;margin-top:3px}
+.acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.acts button{border:1px solid var(--g);background:#fff;color:var(--g);border-radius:8px;padding:8px 12px;font-weight:600;font-size:13px}
+.acts button.f{background:var(--g);color:#fff}
+.acts button.c2{border-color:#c0392b;color:#c0392b}
+.alert{background:#fdecc8;color:#6b4500;border-radius:14px;padding:14px;margin-bottom:14px;font-weight:600;font-size:14px}
+.chart{display:flex;align-items:flex-end;gap:8px;height:110px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 14px 8px;margin-bottom:6px}
+.chart div{flex:1;text-align:center;font-size:11px;color:var(--m);display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+.chart i{display:block;background:var(--g);border-radius:4px 4px 0 0;min-height:3px}
+.item{display:flex;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;font-weight:600}
+.item span{color:var(--m);font-weight:400}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 0 calc(10px + env(safe-area-inset-bottom,0px));z-index:9}
+nav button{border:0;background:none;color:var(--m);font-size:12px;font-weight:600;position:relative}
+nav button i{display:block;font-style:normal;font-size:21px}
+nav button.on{color:var(--g)}
+nav button em{position:absolute;top:-2px;right:2px;background:#e74c3c;color:#fff;font-style:normal;font-size:10px;border-radius:10px;padding:1px 6px}
+#app,nav{display:none}
+</style>
+</head>
+<body>
+
+<div id="loginBox" class="wrap">
+  <div class="logo">Kwik<span>Serve</span></div>
+  <p class="sub c">Admin Panel. Authorized admins only.</p>
+  <input id="email" type="email" placeholder="Email address">
+  <input id="pass" type="password" placeholder="Password">
+  <div class="err" id="err"></div>
+  <button class="btn" onclick="login()">Login</button>
+</div>
+
+<div id="app">
+  <div class="bar">Kwik<span>Serve</span> Admin</div>
+  <div class="wrap" id="view"></div>
+</div>
+
+<div id="zoom" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99;align-items:center;justify-content:center"><img style="max-width:95%;max-height:90%"></div>
+
+<nav id="nav">
+  <button data-t="home" class="on" onclick="setTab('home')"><i>🏠</i>Home</button>
+  <button data-t="orders" onclick="setTab('orders')"><i>📦</i>Orders</button>
+  <button data-t="users" onclick="setTab('users')"><i>👥</i>Users</button>
+  <button data-t="riders" onclick="setTab('riders')"><i>🏍️</i>Riders<em id="badge" style="display:none"></em></button>
+  <button data-t="more" onclick="setTab('more')"><i>⚙️</i>More</button>
+</nav>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,getDoc,updateDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyB2PwMANFFwt8Q1Lr3que1MmMfNFJM1fCs",
+  authDomain: "kwikserve-b381d.firebaseapp.com",
+  projectId: "kwikserve-b381d",
+  storageBucket: "kwikserve-b381d.firebasestorage.app",
+  messagingSenderId: "708250783049",
+  appId: "1:708250783049:web:a47018811f651e32451e98"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const $ = id => document.getElementById(id);
+let orders=[], users=[], tab='home', oF='All', rF='All', adminEmail='';
+
+const esc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const showErr = m => {const e=$('err');e.textContent=m;e.style.display='block'};
+const riders = () => users.filter(u=>u.role==='rider');
+const customers = () => users.filter(u=>u.role==='customer');
+const money = n => 'GH₵ ' + n;
+
+window.login = async () => {
+  try{ await signInWithEmailAndPassword(auth,$('email').value.trim(),$('pass').value); }
+  catch(e){ showErr('Wrong email or password.'); }
+};
+window.logout = () => signOut(auth);
+window.setTab = async t => { tab=t; await load(); };
+window.setOF = f => { oF=f; render(); };
+window.setRF = f => { rF=f; render(); };
+window.setStatus = async (id,st) => {
+  try{ await updateDoc(doc(db,'orders',id),{status:st}); const o=orders.find(x=>x.id===id); if(o)o.status=st; render(); }
+  catch(e){ alert('Could not update. Check your internet.'); }
+};
+window.setApproval = async (id,v) => {
+  try{ await updateDoc(doc(db,'users',id),{approved:v}); const u=users.find(x=>x.id===id); if(u)u.approved=v; render(); }
+  catch(e){ alert('Could not update. Make sure the new rules are published.'); }
+};
+
+function chips(list,cur,fn){
+  return '<div class="chips">'+list.map(x=>'<button class="'+(x===cur?'on':'')+'" onclick="'+fn+'(\''+x+'\')">'+x+'</button>').join('')+'</div>';
+}
+function orderBtns(o){
+  const mk=(l,s,c)=>'<button class="'+(c||'')+'" onclick="setStatus(\''+o.id+'\',\''+s+'\')">'+l+'</button>', b=[];
+  if(o.status==='Pending') b.push(mk('Accept','Accepted','f'));
+  if(o.status!=='Delivered' && o.status!=='Cancelled') b.push(mk('Cancel','Cancelled','c2'));
+  return b.join('');
+}
+function orderCard(o){
+  return '<div class="card"><div class="row"><b>'+esc(o.orderId)+'</b><span class="tag '+esc(o.status)+'">'+esc(o.status)+'</span></div>'+
+   '<small>From: '+esc(o.sender)+'</small><small>To: '+esc(o.recipient)+'</small><small>'+esc(o.pickup)+' → '+esc(o.dropoff)+'</small>'+
+   '<small>'+esc(o.package)+' · GH₵ '+esc(o.fee)+' · '+esc(o.payment)+'</small>'+(o.riderName?'<small>Rider: '+esc(o.riderName)+'</small>':'')+
+   '<div class="acts">'+orderBtns(o)+'</div></div>';
+}
+function docsHtml(u){
+  const L=[['doc_license','License'],['doc_card','Ghana Card'],['doc_reg','Registration']].filter(d=>typeof u[d[0]]==='string' && u[d[0]].indexOf('data:image/')===0);
+  if(!L.length) return '<small>No documents uploaded</small>';
+  return '<div style="display:flex;gap:8px;margin-top:8px">'+L.map(d=>'<div style="flex:1"><img src="'+esc(u[d[0]])+'" style="width:100%;height:80px;object-fit:cover;border-radius:8px" onclick="zoom(this.src)"><small>'+d[1]+'</small></div>').join('')+'</div>';
+}
+window.zoom = s => { $('zoom').firstElementChild.src=s; $('zoom').style.display='flex'; };
+function riderCard(u){
+  const tag = u.approved!==true ? '<span class="tag wait">Pending approval</span>' : (u.online?'<span class="tag">Online</span>':'<span class="tag off">Offline</span>');
+  const act = u.approved!==true ? '<button class="f" onclick="setApproval(\''+u.id+'\',true)">Approve</button>' : '<button class="c2" onclick="setApproval(\''+u.id+'\',false)">Suspend</button>';
+  return '<div class="card"><div class="row"><b>'+esc(u.name)+'</b>'+tag+'</div><small>'+esc(u.phone)+' · '+esc(u.email)+'</small><small>'+esc(u.bike)+' · '+esc(u.plate)+'</small>'+docsHtml(u)+'<div class="acts">'+act+'</div></div>';
+}
+
+function render(){
+  const pend = riders().filter(r=>r.approved!==true).length;
+  $('badge').style.display = pend ? 'block':'none'; $('badge').textContent = pend;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+  const delivered = orders.filter(o=>o.status==='Delivered');
+  const revenue = delivered.reduce((a,o)=>a+(Number(o.fee)||0),0);
+  let h='';
+  if(tab==='home'){
+    const pendO = orders.filter(o=>o.status==='Pending').length;
+    const activeR = riders().filter(r=>r.approved===true && r.online).length;
+    h += '<h3>Dashboard</h3><div class="stats">'+
+      '<div class="st" style="background:var(--g)"><small>Total orders</small><b>'+orders.length+'</b></div>'+
+      '<div class="st" style="background:#2a7de1"><small>Active riders</small><b>'+activeR+'</b></div>'+
+      '<div class="st" style="background:#e67e22"><small>Pending orders</small><b>'+pendO+'</b></div>'+
+      '<div class="st" style="background:#7d3cf0"><small>Total revenue</small><b>'+money(revenue)+'</b></div></div>';
+    if(pend) h += '<div class="alert" onclick="setTab(\'riders\')">'+pend+' rider'+(pend>1?'s are':' is')+' waiting for approval. Tap to review.</div>';
+    const days=[], now=new Date(); now.setHours(0,0,0,0);
+    for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);days.push(d);}
+    const counts = days.map(d=>orders.filter(o=>{const t=o.createdAt?o.createdAt.toDate():new Date(); return t>=d && t<new Date(d.getTime()+864e5);}).length);
+    const mx = Math.max(1,...counts);
+    h += '<h3>Last 7 days</h3><div class="chart">'+counts.map((c,i)=>'<div><i style="height:'+Math.round(c/mx*80)+'px"></i>'+days[i].toLocaleDateString('en-GB',{weekday:'short'}).slice(0,2)+'</div>').join('')+'</div>';
+  }
+  if(tab==='orders'){
+    const l = orders.filter(o=>oF==='All'||o.status===oF);
+    h += '<h3>Orders</h3>'+chips(['All','Pending','Accepted','Out for delivery','Delivered','Cancelled'],oF,'setOF')+
+      (l.length?l.map(orderCard).join(''):'<p class="sub">No orders here.</p>');
+    h += '<p class="sub">Riders take Accepted orders from their own app.</p>';
+  }
+  if(tab==='users'){
+    const l = customers();
+    h += '<h3>Customers ('+l.length+')</h3>'+(l.length?l.map(u=>'<div class="card"><div class="row"><b>'+esc(u.name||'No name')+'</b><span class="tag">'+orders.filter(o=>o.uid===u.id).length+' orders</span></div><small>'+esc(u.phone||'No phone')+' · '+esc(u.email)+'</small></div>').join(''):'<p class="sub">No customers yet.</p>');
+  }
+  if(tab==='riders'){
+    const l = riders().filter(r=> rF==='All' || (rF==='Pending approval'&&r.approved!==true) || (rF==='Online'&&r.approved===true&&r.online) || (rF==='Offline'&&r.approved===true&&!r.online));
+    h += '<h3>Riders</h3>'+chips(['All','Pending approval','Online','Offline'],rF,'setRF')+(l.length?l.map(riderCard).join(''):'<p class="sub">No riders here.</p>');
+  }
+  if(tab==='more'){
+    const rate = orders.length ? Math.round(delivered.length/orders.length*100) : 0;
+    h += '<h3>Reports</h3><div class="stats">'+
+      '<div class="st" style="background:var(--g)"><small>Total orders</small><b>'+orders.length+'</b></div>'+
+      '<div class="st" style="background:#7d3cf0"><small>Revenue</small><b>'+money(revenue)+'</b></div>'+
+      '<div class="st" style="background:#2a7de1"><small>Delivered</small><b>'+delivered.length+'</b></div>'+
+      '<div class="st" style="background:#e67e22"><small>Completion rate</small><b>'+rate+'%</b></div></div>'+
+      '<h3>Admin</h3><div class="item">Signed in as<span>'+esc(adminEmail)+'</span></div>'+
+      '<div class="item">Support tickets<span>Coming soon</span></div><div class="item">Payment settings<span>Coming soon</span></div><div class="item">SMS settings<span>Coming soon</span></div>'+
+      '<button class="btn" style="background:#c0392b;margin-top:8px" onclick="logout()">Log out</button>';
+  }
+  $('view').innerHTML = h;
+}
+async function load(){
+  const [o,u] = await Promise.all([getDocs(collection(db,'orders')),getDocs(collection(db,'users'))]);
+  const ts = x => (x.createdAt && x.createdAt.seconds) || 0;
+  orders = o.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>ts(b)-ts(a));
+  users = u.docs.map(d=>({id:d.id,...d.data()}));
+  render(); window.scrollTo(0,0);
+}
+
+onAuthStateChanged(auth, async u => {
+  if(!u){ $('app').style.display='none'; $('nav').style.display='none'; $('loginBox').style.display='block'; return; }
+  try{
+    const r = await getDoc(doc(db,'users',u.uid));
+    if(!r.exists() || r.data().role !== 'admin'){ await signOut(auth); showErr('This account is not an admin.'); return; }
+    adminEmail = u.email;
+    $('loginBox').style.display='none'; $('app').style.display='block'; $('nav').style.display='flex';
+    await load();
+  }catch(e){ showErr('Could not load. Check your internet.'); }
+});
+</script>
+</body>
+</html>
