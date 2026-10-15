@@ -364,9 +364,8 @@ function loadGoogle(){
     s.src='https://maps.googleapis.com/maps/api/js?key='+GKEY+'&loading=async&v=weekly';
     s.onload=async()=>{
       try{
-        const L=await Promise.all(['core','maps','places','marker','geometry'].map(n=>google.maps.importLibrary(n)));
-        GL={core:L[0],maps:L[1],places:L[2],marker:L[3],geometry:L[4]};
-        GL.token=new GL.places.AutocompleteSessionToken();
+        const L=await Promise.all(['maps','marker'].map(n=>google.maps.importLibrary(n)));
+        GL={maps:L[0],marker:L[1]};
         res(GL);
       }catch(e){ window.gErr=(e&&e.message)||String(e); gprom=null; res(null); }
     };
@@ -507,7 +506,7 @@ function render(){
 
 
 /* ---------- real order tracking (Google Maps) ---------- */
-let unsub=null, tmap=null, rmark=null, mapBusy=false, mapTok=0, mapObjs=[];
+let unsub=null, tmap=null, rmark=null, mapBusy=false, mapTok=0, mapObjs=[], sBase='', sLast=0;
 const gcache={};
 const pin = e => { const d=document.createElement('div'); d.style.fontSize='28px'; d.textContent=e; return d; };
 
@@ -533,7 +532,7 @@ async function getRoute(a,b){
     });
     const j=await r.json(); const rt=j.routes&&j.routes[0];
     if(!rt||!rt.polyline) return null;
-    return {path:GL.geometry.encoding.decodePath(rt.polyline.encodedPolyline), km:(rt.distanceMeters/1000).toFixed(1), mins:Math.max(1,Math.round(parseInt(rt.duration)/60))};
+    return {enc:rt.polyline.encodedPolyline, path:decodePoly(rt.polyline.encodedPolyline), km:(rt.distanceMeters/1000).toFixed(1), mins:Math.max(1,Math.round(parseInt(rt.duration)/60))};
   }catch(e){ return null; }
 }
 
@@ -541,7 +540,7 @@ window.leaveTrack = () => {
   if(unsub){ unsub(); unsub=null; }
   mapTok++; mapBusy=false;
   mapObjs.forEach(x=>{ try{ x.map=null; }catch(e){} });
-  mapObjs=[]; rmark=null; tmap=null;
+  mapObjs=[]; rmark=null; tmap=null; sBase='';
   $('tmap').innerHTML=''; $('tEta').textContent='';
 };
 window.openTrack = docId => {
@@ -555,10 +554,45 @@ window.trackLatest = () => {
   openTrack(a.id);
 };
 
+function decodePoly(str){
+  let i=0,lat=0,lng=0,out=[];
+  while(i<str.length){
+    let b,sh=0,r=0;
+    do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);
+    lat+=(r&1)?~(r>>1):(r>>1);
+    sh=0;r=0;
+    do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);
+    lng+=(r&1)?~(r>>1):(r>>1);
+    out.push({lat:lat/1e5,lng:lng/1e5});
+  }
+  return out;
+}
+function drawStatic(){
+  if(!sBase) return;
+  let q=sBase; const r=window.lastRiderLoc;
+  if(r) q+='&markers=color:blue%7Clabel:R%7C'+r.lat+','+r.lng;
+  $('tmap').innerHTML='<img alt="Map" style="width:100%;height:100%;object-fit:cover;border-radius:16px" src="https://maps.googleapis.com/maps/api/staticmap?'+q+'&key='+GKEY+'">';
+  $('tmap').firstChild.onerror=()=>{ $('tmap').innerHTML='<p class="sub" style="padding:14px">Map image could not load. In Google Cloud, enable Maps Static API and tick it on your key.</p>'; };
+  sLast=Date.now();
+}
+async function staticMap(o,tok){
+  const a=o.pickupLoc||await geocode(o.pickup+', Ghana'); if(tok!==mapTok) return;
+  const b=o.dropoffLoc||await geocode(o.dropoff+', Ghana'); if(tok!==mapTok) return;
+  if(!a&&!b){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Could not find these addresses on the map.</p>'; return; }
+  let q='size=640x400&scale=2&maptype=roadmap';
+  if(a) q+='&markers=color:green%7Clabel:P%7C'+a.lat+','+a.lng;
+  if(b) q+='&markers=color:red%7Clabel:D%7C'+b.lat+','+b.lng;
+  if(a&&b){
+    const rt=await getRoute(a,b); if(tok!==mapTok) return;
+    if(rt){ q+='&path=color:0x2a7de1ff%7Cweight:5%7Cenc:'+encodeURIComponent(rt.enc); $('tEta').textContent='Route: '+rt.km+' km · about '+rt.mins+' min by road'; }
+    else q+='&path=color:0x2a7de1ff%7Cweight:4%7C'+a.lat+','+a.lng+'%7C'+b.lat+','+b.lng;
+  }
+  sBase=q; drawStatic();
+}
 async function initTrackMap(o){
   mapBusy=true; const tok=++mapTok;
   const lib=await loadGoogle(); if(tok!==mapTok) return;
-  if(!lib){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Google Maps could not load'+(window.gErr?' ('+esc(window.gErr)+')':'')+'.</p>'; return; }
+  if(!lib){ await staticMap(o,tok); return; }
   const m=new lib.maps.Map($('tmap'),{center:{lat:5.6037,lng:-0.1870},zoom:11,mapId:'DEMO_MAP_ID',disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy'});
   tmap=m;
   const a=o.pickupLoc||await geocode(o.pickup+', Ghana'); if(tok!==mapTok) return;
@@ -573,12 +607,13 @@ async function initTrackMap(o){
     mapObjs.push({set map(v){ line.setMap(v); }});
     if(rt) $('tEta').textContent='Route: '+rt.km+' km · about '+rt.mins+' min by road';
   }
-  if(pts.length>1){ const bd=new lib.core.LatLngBounds(); pts.forEach(p=>bd.extend(p)); m.fitBounds(bd,40); }
+  if(pts.length>1){ const la=pts.map(p=>p.lat), ln=pts.map(p=>p.lng); m.fitBounds({north:Math.max(...la),south:Math.min(...la),east:Math.max(...ln),west:Math.min(...ln)},40); }
   else if(pts.length===1){ m.setCenter(pts[0]); m.setZoom(15); }
   if(window.lastRiderLoc) placeRider(window.lastRiderLoc);
 }
 function placeRider(loc){
-  if(!tmap||!GL) return;
+  if(!tmap){ if(sBase && Date.now()-sLast>15000) drawStatic(); return; }
+  if(!GL) return;
   const ll={lat:loc.lat,lng:loc.lng};
   if(!rmark){ rmark=new GL.marker.AdvancedMarkerElement({map:tmap,position:ll,content:pin('🏍️'),title:'Rider'}); mapObjs.push(rmark); }
   else rmark.position=ll;
