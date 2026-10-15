@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KwikServe</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root{--g:#0b6b2e;--gd:#07501f;--y:#f5c518;--bg:#f6f8f6;--t:#14211a;--m:#6b7a70;--line:#e2e8e3}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -68,7 +66,7 @@ nav button.on{color:var(--g)}
 .av{width:56px;height:56px;border-radius:50%;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
 .item{display:flex;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:10px;font-weight:600}
 .item span{color:var(--m)}
-#tmap{height:220px;border-radius:16px;margin:12px 0;z-index:0}
+#tmap{height:260px;border-radius:16px;margin:12px 0;z-index:0;background:#e9eee9}
 .prog{display:flex;justify-content:space-between;margin:12px 0;font-size:11px;color:var(--m);text-align:center}
 .prog div{flex:1}.prog i{display:block;width:26px;height:26px;border-radius:50%;background:var(--line);margin:0 auto 4px;line-height:26px;font-style:normal;color:#fff;font-weight:700}
 .prog .on{color:var(--g);font-weight:700}.prog .on i{background:var(--g)}
@@ -211,6 +209,7 @@ nav button.on{color:var(--g)}
   <div class="row"><h2 id="tId" style="margin:0"></h2><span class="tag" id="tTag"></span></div>
   <p class="sub" id="tSub">Loading...</p>
   <div id="tmap"></div>
+  <p class="sub" id="tEta" style="margin-bottom:6px"></p>
   <div class="prog" id="tProg"></div>
   <div class="card" id="tRider"></div>
 </section>
@@ -341,39 +340,58 @@ const auth = getAuth(app), db = getFirestore(app);
 const $ = id => document.getElementById(id);
 let orders = [];
 
-/* ====================================================== */
-/*  PASTE YOUR GOOGLE MAPS API KEY BETWEEN THE QUOTES     */
-/*  (this is the ONLY place you need to paste it)         */
-/* ====================================================== */
+/* ############################################################## */
+/* ##                                                          ## */
+/* ##   >>>  PASTE YOUR GOOGLE MAPS API KEY BELOW  <<<         ## */
+/* ##   Replace ONLY the text between the quotes.              ## */
+/* ##   This is the ONLY place the key goes.                   ## */
+/* ##                                                          ## */
+/* ############################################################## */
 const GKEY='AIzaSyAu66FcINAcm6P_tk2eEFsMYDD-UOzOkSM';
-/* ====================================================== */
+/* ############################################################## */
 
 const hasKey=()=>GKEY && !GKEY.startsWith('PASTE');
-let placesLib=null, gtoken=null;
+
+/* ---------- Google Maps loader (Maps + Places + Marker + Geometry) ---------- */
+let GL=null, gprom=null;
 function loadGoogle(){
-  if(placesLib||!hasKey()) return Promise.resolve(placesLib);
-  return new Promise(res=>{
+  if(GL) return Promise.resolve(GL);
+  if(!hasKey()) return Promise.resolve(null);
+  if(gprom) return gprom;
+  gprom=new Promise(res=>{
     const s=document.createElement('script');
     s.src='https://maps.googleapis.com/maps/api/js?key='+GKEY+'&loading=async&v=weekly';
-    s.onload=async()=>{try{placesLib=await google.maps.importLibrary('places');gtoken=new placesLib.AutocompleteSessionToken();res(placesLib)}catch(e){res(null)}};
-    s.onerror=()=>res(null);
+    s.onload=async()=>{
+      try{
+        const L=await Promise.all(['core','maps','places','marker','geometry'].map(n=>google.maps.importLibrary(n)));
+        GL={core:L[0],maps:L[1],places:L[2],marker:L[3],geometry:L[4]};
+        GL.token=new GL.places.AutocompleteSessionToken();
+        res(GL);
+      }catch(e){ gprom=null; res(null); }
+    };
+    s.onerror=()=>{ gprom=null; res(null); };
     document.head.appendChild(s);
   });
+  return gprom;
 }
+
+/* ---------- Address suggestions (Places API New) ---------- */
 const picked={};
 function attachAuto(id){
   const inp=$(id), box=document.createElement('div');
   box.className='sug'; box.style.display='none';
   inp.insertAdjacentElement('afterend',box);
   let tm;
+  const bad=msg=>{ box.innerHTML='<div style="color:#c0392b">'+esc(msg)+'</div>'; box.style.display='block'; };
   inp.addEventListener('input',()=>{
     delete picked[id]; clearTimeout(tm);
     const v=inp.value.trim();
-    if(v.length<3){box.style.display='none';return}
+    if(v.length<3){ box.style.display='none'; return; }
     tm=setTimeout(async()=>{
-      const lib=await loadGoogle(); if(!lib) return;
+      const lib=await loadGoogle();
+      if(!lib) return bad('Suggestions unavailable. Check the Google key in index.html.');
       try{
-        const r=await lib.AutocompleteSuggestion.fetchAutocompleteSuggestions({input:v,includedRegionCodes:['gh'],sessionToken:gtoken});
+        const r=await lib.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({input:v,includedRegionCodes:['gh'],sessionToken:lib.token});
         box.innerHTML='';
         r.suggestions.slice(0,5).forEach(s=>{
           const p=s.placePrediction; if(!p) return;
@@ -383,13 +401,13 @@ function attachAuto(id){
             try{
               const pl=p.toPlace(); await pl.fetchFields({fields:['location']});
               picked[id]={lat:pl.location.lat(),lng:pl.location.lng()};
-              gtoken=new lib.AutocompleteSessionToken();
+              lib.token=new lib.places.AutocompleteSessionToken();
             }catch(e){}
           };
           box.appendChild(d);
         });
-        box.style.display=box.children.length?'block':'none';
-      }catch(e){console.log(e)}
+        if(box.children.length) box.style.display='block'; else bad('No matching addresses. Keep typing.');
+      }catch(e){ bad('Suggestions error: '+(e.message||e)); }
     },300);
   });
 }
@@ -483,10 +501,11 @@ function render(){
 }
 
 
-/* ---------- real order tracking ---------- */
-let unsub=null, tmap=null, rmark=null;
+/* ---------- real order tracking (Google Maps) ---------- */
+let unsub=null, tmap=null, rmark=null, mapBusy=false, mapTok=0, mapObjs=[];
 const gcache={};
-const icon = e => L.divIcon({html:'<div style="font-size:26px">'+e+'</div>',className:'',iconSize:[26,26],iconAnchor:[13,22]});
+const pin = e => { const d=document.createElement('div'); d.style.fontSize='28px'; d.textContent=e; return d; };
+
 async function geocode(addr){
   const k=addr.toLowerCase();
   if(gcache[k]!==undefined) return gcache[k];
@@ -494,21 +513,31 @@ async function geocode(addr){
   if(hasKey()){
     try{
       const j=await (await fetch('https://maps.googleapis.com/maps/api/geocode/json?components=country:GH&address='+encodeURIComponent(addr)+'&key='+GKEY)).json();
-      if(j.results&&j.results[0]){const l=j.results[0].geometry.location; r=[l.lat,l.lng];}
-    }catch(e){}
-  }
-  if(!r){
-    try{
-      const x=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=gh&q='+encodeURIComponent(addr));
-      const j=await x.json(); if(j[0]) r=[+j[0].lat,+j[0].lon];
+      if(j.results&&j.results[0]){ const l=j.results[0].geometry.location; r={lat:l.lat,lng:l.lng}; }
     }catch(e){}
   }
   gcache[k]=r; return r;
 }
+
+async function getRoute(a,b){
+  try{
+    const r=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Goog-Api-Key':GKEY,'X-Goog-FieldMask':'routes.polyline.encodedPolyline,routes.distanceMeters,routes.duration'},
+      body:JSON.stringify({origin:{location:{latLng:{latitude:a.lat,longitude:a.lng}}},destination:{location:{latLng:{latitude:b.lat,longitude:b.lng}}},travelMode:'DRIVE'})
+    });
+    const j=await r.json(); const rt=j.routes&&j.routes[0];
+    if(!rt||!rt.polyline) return null;
+    return {path:GL.geometry.encoding.decodePath(rt.polyline.encodedPolyline), km:(rt.distanceMeters/1000).toFixed(1), mins:Math.max(1,Math.round(parseInt(rt.duration)/60))};
+  }catch(e){ return null; }
+}
+
 window.leaveTrack = () => {
   if(unsub){ unsub(); unsub=null; }
-  if(tmap){ tmap.remove(); tmap=null; }
-  rmark=null;
+  mapTok++; mapBusy=false;
+  mapObjs.forEach(x=>{ try{ x.map=null; }catch(e){} });
+  mapObjs=[]; rmark=null; tmap=null;
+  $('tmap').innerHTML=''; $('tEta').textContent='';
 };
 window.openTrack = docId => {
   leaveTrack(); go('track');
@@ -520,17 +549,34 @@ window.trackLatest = () => {
   const a = orders.find(o=>o.status!=='Delivered' && o.status!=='Cancelled') || orders[0];
   openTrack(a.id);
 };
+
 async function initTrackMap(o){
-  if(typeof L==='undefined'){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Map could not load.</p>'; return; }
-  const m = tmap = L.map('tmap').setView([5.6037,-0.1870],11);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
-  const a=o.pickupLoc?[o.pickupLoc.lat,o.pickupLoc.lng]:await geocode(o.pickup+', Ghana'); if(tmap!==m) return;
-  const b=o.dropoffLoc?[o.dropoffLoc.lat,o.dropoffLoc.lng]:await geocode(o.dropoff+', Ghana'); if(tmap!==m) return;
+  mapBusy=true; const tok=++mapTok;
+  const lib=await loadGoogle(); if(tok!==mapTok) return;
+  if(!lib){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Google Maps could not load. Check the key in index.html and that billing is on.</p>'; return; }
+  const m=new lib.maps.Map($('tmap'),{center:{lat:5.6037,lng:-0.1870},zoom:11,mapId:'DEMO_MAP_ID',disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy'});
+  tmap=m;
+  const a=o.pickupLoc||await geocode(o.pickup+', Ghana'); if(tok!==mapTok) return;
+  const b=o.dropoffLoc||await geocode(o.dropoff+', Ghana'); if(tok!==mapTok) return;
   const pts=[];
-  if(a){ L.marker(a,{icon:icon('📍')}).addTo(m).bindPopup('Pickup'); pts.push(a); }
-  if(b){ L.marker(b,{icon:icon('🏁')}).addTo(m).bindPopup('Drop-off'); pts.push(b); }
-  if(a&&b) L.polyline([a,b],{color:'#2a7de1',weight:4,dashArray:'6'}).addTo(m);
-  if(pts.length) m.fitBounds(pts,{padding:[30,30],maxZoom:15});
+  if(a){ mapObjs.push(new lib.marker.AdvancedMarkerElement({map:m,position:a,content:pin('📍'),title:'Pickup'})); pts.push(a); }
+  if(b){ mapObjs.push(new lib.marker.AdvancedMarkerElement({map:m,position:b,content:pin('🏁'),title:'Drop-off'})); pts.push(b); }
+  if(a&&b){
+    const rt=await getRoute(a,b); if(tok!==mapTok) return;
+    const path=rt?rt.path:[a,b];
+    const line=new lib.maps.Polyline({path:path,strokeColor:'#2a7de1',strokeWeight:5,strokeOpacity:.9,map:m});
+    mapObjs.push({set map(v){ line.setMap(v); }});
+    if(rt) $('tEta').textContent='Route: '+rt.km+' km · about '+rt.mins+' min by road';
+  }
+  if(pts.length>1){ const bd=new lib.core.LatLngBounds(); pts.forEach(p=>bd.extend(p)); m.fitBounds(bd,40); }
+  else if(pts.length===1){ m.setCenter(pts[0]); m.setZoom(15); }
+  if(window.lastRiderLoc) placeRider(window.lastRiderLoc);
+}
+function placeRider(loc){
+  if(!tmap||!GL) return;
+  const ll={lat:loc.lat,lng:loc.lng};
+  if(!rmark){ rmark=new GL.marker.AdvancedMarkerElement({map:tmap,position:ll,content:pin('🏍️'),title:'Rider'}); mapObjs.push(rmark); }
+  else rmark.position=ll;
 }
 function paintTrack(o){
   const delivered = o.status==='Delivered', cancelled = o.status==='Cancelled';
@@ -547,11 +593,9 @@ function paintTrack(o){
   $('tRider').innerHTML = o.riderId
     ? '<small>Rider</small><b>'+esc(o.riderName)+'</b><small>'+esc(o.riderPhone)+'</small>'+(tel?'<a class="btn" style="margin-top:12px" href="tel:'+esc(tel)+'">📞 Call rider</a>':'')
     : '<small>Rider</small><b>Not assigned yet</b>';
-  if(!tmap) initTrackMap(o);
-  if(tmap && o.riderLoc && typeof o.riderLoc.lat==='number' && !delivered){
-    const ll=[o.riderLoc.lat,o.riderLoc.lng];
-    if(!rmark) rmark=L.marker(ll,{icon:icon('🏍️')}).addTo(tmap); else rmark.setLatLng(ll);
-  }
+  window.lastRiderLoc = (o.riderLoc && typeof o.riderLoc.lat==='number' && !delivered) ? o.riderLoc : null;
+  if(!tmap && !mapBusy) initTrackMap(o);
+  else if(window.lastRiderLoc) placeRider(window.lastRiderLoc);
 }
 
 onAuthStateChanged(auth, async u => {
