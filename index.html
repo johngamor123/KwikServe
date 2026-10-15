@@ -579,7 +579,7 @@ async function staticMap(o,tok){
   const a=o.pickupLoc||await geocode(o.pickup+', Ghana'); if(tok!==mapTok) return;
   const b=o.dropoffLoc||await geocode(o.dropoff+', Ghana'); if(tok!==mapTok) return;
   if(!a&&!b){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Could not find these addresses on the map.</p>'; return; }
-  let q='size=640x400&scale=2&maptype=roadmap';
+  let q='size=640x512&scale=2&maptype=roadmap';
   if(a) q+='&markers=color:green%7Clabel:P%7C'+a.lat+','+a.lng;
   if(b) q+='&markers=color:red%7Clabel:D%7C'+b.lat+','+b.lng;
   if(a&&b){
