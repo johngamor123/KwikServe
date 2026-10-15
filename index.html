@@ -354,6 +354,7 @@ const hasKey=()=>GKEY && !GKEY.startsWith('PASTE');
 
 /* ---------- Google Maps loader (Maps + Places + Marker + Geometry) ---------- */
 let GL=null, gprom=null;
+window.gm_authFailure=()=>{ window.gErr='Google rejected the key (check website restriction, billing, and that Maps JavaScript API is enabled)'; };
 function loadGoogle(){
   if(GL) return Promise.resolve(GL);
   if(!hasKey()) return Promise.resolve(null);
@@ -367,9 +368,9 @@ function loadGoogle(){
         GL={core:L[0],maps:L[1],places:L[2],marker:L[3],geometry:L[4]};
         GL.token=new GL.places.AutocompleteSessionToken();
         res(GL);
-      }catch(e){ gprom=null; res(null); }
+      }catch(e){ window.gErr=(e&&e.message)||String(e); gprom=null; res(null); }
     };
-    s.onerror=()=>{ gprom=null; res(null); };
+    s.onerror=()=>{ window.gErr='the Google script was blocked or offline'; gprom=null; res(null); };
     document.head.appendChild(s);
   });
   return gprom;
@@ -377,6 +378,8 @@ function loadGoogle(){
 
 /* ---------- Address suggestions (Places API New) ---------- */
 const picked={};
+const newSession=()=>(window.crypto&&crypto.randomUUID?crypto.randomUUID():('s'+Date.now()+Math.floor(Math.random()*1e9)));
+let SESSION=newSession();
 function attachAuto(id){
   const inp=$(id), box=document.createElement('div');
   box.className='sug'; box.style.display='none';
@@ -388,26 +391,28 @@ function attachAuto(id){
     const v=inp.value.trim();
     if(v.length<3){ box.style.display='none'; return; }
     tm=setTimeout(async()=>{
-      const lib=await loadGoogle();
-      if(!lib) return bad('Suggestions unavailable. Check the Google key in index.html.');
+      if(!hasKey()) return bad('Add your Google key on line 350 of index.html.');
       try{
-        const r=await lib.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({input:v,includedRegionCodes:['gh'],sessionToken:lib.token});
+        const res=await fetch('https://places.googleapis.com/v1/places:autocomplete',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':GKEY},body:JSON.stringify({input:v,includedRegionCodes:['gh'],sessionToken:SESSION})});
+        const j=await res.json();
+        if(j.error) return bad('Google says: '+(j.error.message||j.error.status));
         box.innerHTML='';
-        r.suggestions.slice(0,5).forEach(s=>{
+        (j.suggestions||[]).slice(0,5).forEach(s=>{
           const p=s.placePrediction; if(!p) return;
           const d=document.createElement('div'); d.textContent=p.text.text;
           d.onclick=async()=>{
             inp.value=p.text.text; box.style.display='none';
             try{
-              const pl=p.toPlace(); await pl.fetchFields({fields:['location']});
-              picked[id]={lat:pl.location.lat(),lng:pl.location.lng()};
-              lib.token=new lib.places.AutocompleteSessionToken();
+              const r2=await fetch('https://places.googleapis.com/v1/places/'+p.placeId+'?sessionToken='+SESSION,{headers:{'X-Goog-Api-Key':GKEY,'X-Goog-FieldMask':'location'}});
+              const pj=await r2.json();
+              if(pj.location) picked[id]={lat:pj.location.latitude,lng:pj.location.longitude};
+              SESSION=newSession();
             }catch(e){}
           };
           box.appendChild(d);
         });
         if(box.children.length) box.style.display='block'; else bad('No matching addresses. Keep typing.');
-      }catch(e){ bad('Suggestions error: '+(e.message||e)); }
+      }catch(e){ bad('Could not reach Google: '+(e.message||e)); }
     },300);
   });
 }
@@ -553,7 +558,7 @@ window.trackLatest = () => {
 async function initTrackMap(o){
   mapBusy=true; const tok=++mapTok;
   const lib=await loadGoogle(); if(tok!==mapTok) return;
-  if(!lib){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Google Maps could not load. Check the key in index.html and that billing is on.</p>'; return; }
+  if(!lib){ $('tmap').innerHTML='<p class="sub" style="padding:14px">Google Maps could not load'+(window.gErr?' ('+esc(window.gErr)+')':'')+'.</p>'; return; }
   const m=new lib.maps.Map($('tmap'),{center:{lat:5.6037,lng:-0.1870},zoom:11,mapId:'DEMO_MAP_ID',disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy'});
   tmap=m;
   const a=o.pickupLoc||await geocode(o.pickup+', Ghana'); if(tok!==mapTok) return;
