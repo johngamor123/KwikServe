@@ -103,6 +103,7 @@ nav button i{display:block;font-style:normal;font-size:21px}nav button.on{color:
 <section class="screen" id="home">
   <div class="top"><div style="display:flex;gap:12px;align-items:center"><div class="av" id="hAv"></div><div><small class="sub" id="hGreet" style="margin:0"></small><br><b id="hName"></b></div></div><button class="back" style="font-size:22px;margin:0" onclick="go('notifs')">🔔</button></div>
   <div class="earn"><small>Today's earnings</small><b id="hToday">GH₵ 0</b><button onclick="go('earnings')">View details</button></div>
+  <div class="card" id="hSub"></div>
   <div class="grid">
     <div class="tile" onclick="document.getElementById('reqs').scrollIntoView()"><i>📦</i>New orders<b id="hNew">0</b></div>
     <div class="tile" onclick="go('deliveries','on')"><i>🏍️</i>On going<b id="hOn">0</b></div>
@@ -127,7 +128,7 @@ nav button i{display:block;font-style:normal;font-size:21px}nav button.on{color:
 <section class="screen" id="done">
   <button class="back" onclick="go('home')">← Delivery Completed</button>
   <div class="big"><div class="ok">✓</div><p id="dId" class="sub" style="margin:0"></p><h2 style="color:var(--g)">Successfully Delivered!</h2></div>
-  <div class="card"><div class="row"><b>Earnings</b><b id="dEarn" style="font-size:22px;color:var(--g)"></b></div></div>
+  <div class="card"><div class="row"><b>You earned</b><b id="dEarn" style="font-size:22px;color:var(--g)"></b></div></div>
   <button class="btn" onclick="go('deliveries','done')">View details</button>
   <button class="btn ghost" onclick="go('home')">Back to home</button>
 </section>
@@ -142,7 +143,7 @@ nav button i{display:block;font-style:normal;font-size:21px}nav button.on{color:
 
 <section class="screen" id="earnings">
   <h2>Earnings</h2>
-  <div class="earn"><small>Total earnings</small><b id="eTotal"></b></div>
+  <div class="earn"><small>Total earnings (yours to keep)</small><b id="eTotal"></b></div>
   <p style="font-weight:700">This week</p>
   <div class="chart" id="eChart"></div>
   <div class="grid"><div class="tile">Today's earnings<b id="eToday"></b></div><div class="tile">Completed deliveries<b id="eCount"></b></div></div>
@@ -189,8 +190,9 @@ nav button i{display:block;font-style:normal;font-size:21px}nav button.on{color:
 
 <section class="screen" id="help">
   <button class="back" onclick="go('profile')">← Help &amp; Support</button>
-  <div class="card"><b>How do I get orders?</b><small>Go online on the Home screen. New requests appear there once the admin accepts a customer order.</small></div>
-  <div class="card"><b>How do I get paid?</b><small>Your earnings are shown on the Earnings screen after each delivery is marked delivered.</small></div>
+  <div class="card"><b>How do I get orders?</b><small>Make sure your subscription is active, then go online on the Home screen. New requests appear there once the admin accepts a customer order.</small></div>
+  <div class="card"><b>How does the subscription work?</b><small id="helpSub"></small></div>
+  <div class="card"><b>How do I get paid?</b><small>The customer pays you directly (cash or Mobile Money). You keep everything you earn. Collect the money before you tap Mark as delivered.</small></div>
   <div class="card"><b>Need more help?</b><small>Contact KwikServe support.</small></div>
 </section>
 
@@ -231,12 +233,31 @@ const app = initializeApp({
 });
 const auth = getAuth(app), db = getFirestore(app);
 const $ = id => document.getElementById(id);
+
+/* ############################################################## */
+/* ##                                                          ## */
+/* ##   >>>  PUT YOUR MOMO NUMBER BELOW  <<<                   ## */
+/* ##   Riders send the GH₵30 subscription to this number.     ## */
+/* ##   Replace ONLY the text between the quotes.              ## */
+/* ##                                                          ## */
+/* ############################################################## */
+const PAY_NUMBER='PASTE_YOUR_MOMO_NUMBER_HERE';
+/* ############################################################## */
+const SUB_PRICE=30, SUB_HOURS=12;
+
 const esc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const nameOf = s => String(s||'').split(' · ')[0];
 const phoneOf = s => { const p=String(s||'').split(' · '); return p.length>1?p[p.length-1]:''; };
 const money = n => 'GH₵ ' + (Math.round(n*100)/100);
 const NAV = ['home','deliveries','earnings','profile'];
-let me=null, avail=[], mine=[], dTab='on', selId=null, editMode='p', splashDone=false, authState='wait';
+let me=null, avail=[], mine=[], dTab='on', selId=null, editMode='p', splashDone=false, authState='wait', seenReq=null;
+
+/* ---------- subscription helpers ---------- */
+const subMs = () => (me && me.subEnds && me.subEnds.toMillis) ? me.subEnds.toMillis()-Date.now() : 0;
+const fmtLeft = ms => { const m=Math.max(0,Math.floor(ms/60000)); return Math.floor(m/60)+'h '+(m%60)+'m'; };
+const payHint = () => PAY_NUMBER.startsWith('PASTE')
+  ? 'Contact KwikServe to pay GH₵'+SUB_PRICE+' and get '+SUB_HOURS+' hours of work.'
+  : 'Send GH₵'+SUB_PRICE+' by Mobile Money to '+PAY_NUMBER+', then tell KwikServe. You get '+SUB_HOURS+' hours of work.';
 
 function store(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){} return null; }
 function declined(){ try{ return JSON.parse(store('ks_dec')||'[]'); }catch(e){ return []; } }
@@ -245,6 +266,15 @@ function authMsg(c){return ({'auth/email-already-in-use':'That email is already 
 const tsOf = o => (o.createdAt && o.createdAt.seconds) || 0;
 const dsec = o => (o.deliveredAt && o.deliveredAt.seconds) || 0;
 function ago(sec){ if(!sec) return 'just now'; const m=Math.max(0,Math.round((Date.now()/1000-sec)/60)); if(m<1) return 'just now'; if(m<60) return m+' mins ago'; if(m<1440) return Math.round(m/60)+' hrs ago'; return Math.round(m/1440)+' days ago'; }
+
+/* ---------- new request alert ---------- */
+let actx=null;
+document.addEventListener('click',()=>{ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } });
+function beep(){
+  if(store('ks_sound')==='0') return;
+  try{ if(actx){ const o=actx.createOscillator(), g=actx.createGain(); o.connect(g); g.connect(actx.destination); o.frequency.value=880; g.gain.value=.25; o.start(); o.stop(actx.currentTime+.5); } }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([250,120,250]);
+}
 
 window.go = (id,arg) => {
   if(id!=='ongoing') stopMap();
@@ -257,7 +287,7 @@ window.go = (id,arg) => {
   window.scrollTo(0,0);
 };
 function paint(id){
-  const f = {home:pHome,request:pRequest,ongoing:pOngoing,deliveries:pDeliveries,earnings:pEarnings,statement:pStatement,profile:pProfile,notifs:pNotifs,settings:pSettings,docs:pDocs}[id];
+  const f = {home:pHome,request:pRequest,ongoing:pOngoing,deliveries:pDeliveries,earnings:pEarnings,statement:pStatement,profile:pProfile,notifs:pNotifs,settings:pSettings,docs:pDocs,help:pHelp}[id];
   if(f) f();
 }
 function cur(){ return document.querySelector('.screen.on').id; }
@@ -292,9 +322,20 @@ window.logout = () => signOut(auth);
 async function load(){
   if(!auth.currentUser) return;
   const uid = auth.currentUser.uid;
-  const a = await getDocs(query(collection(db,'orders'),where('status','==','Accepted')));
+  try{ const ur = await getDoc(doc(db,'users',uid)); if(ur.exists()) me = ur.data(); }catch(e){}
+  if(me.online && subMs()<=0){
+    me.online=false;
+    setDoc(doc(db,'users',uid),{online:false},{merge:true}).catch(()=>{});
+  }
   const dec = declined();
-  avail = a.docs.map(d=>({id:d.id,...d.data()})).filter(o=>!o.riderId && !dec.includes(o.id)).sort((x,y)=>tsOf(y)-tsOf(x));
+  let a = [];
+  if(subMs()>0){
+    try{ a = (await getDocs(query(collection(db,'orders'),where('status','==','Accepted')))).docs.map(d=>({id:d.id,...d.data()})); }catch(e){ a=[]; }
+  }
+  avail = a.filter(o=>!o.riderId && !dec.includes(o.id)).sort((x,y)=>tsOf(y)-tsOf(x));
+  const ids = new Set(avail.map(o=>o.id));
+  if(seenReq && me.online && avail.some(o=>!seenReq.has(o.id))) beep();
+  seenReq = ids;
   const m = await getDocs(query(collection(db,'orders'),where('riderId','==',uid)));
   mine = m.docs.map(d=>({id:d.id,...d.data()})).sort((x,y)=>tsOf(y)-tsOf(x));
   paint(cur());
@@ -307,22 +348,30 @@ const sameDay = (sec,d) => { if(!sec) return false; const t=new Date(sec*1000); 
 
 /* ---------- home ---------- */
 function pHome(){
-  const h=new Date().getHours();
+  const h=new Date().getHours(), ms=subMs(), live = !!me.online && ms>0;
   $('hGreet').textContent = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
   $('hName').textContent = me.name; $('hAv').textContent=(me.name[0]||'?').toUpperCase();
   const today = doneL().filter(o=>sameDay(dsec(o),new Date())).reduce((a,o)=>a+(Number(o.fee)||0),0);
   $('hToday').textContent = money(today);
-  $('hNew').textContent = me.online?avail.length:0; $('hOn').textContent=ongoingL().length; $('hDone').textContent=doneL().length; $('hCanc').textContent=cancL().length;
-  $('hTg').classList.toggle('on',!!me.online); $('hOnlineTxt').textContent = me.online?'You are Online':'Go Online';
-  const reqs = me.online?avail:[];
-  $('reqList').innerHTML = !me.online ? '<p class="sub">Go online to see new delivery requests.</p>'
+  $('hSub').innerHTML = ms>0
+    ? '<div class="row"><b>Subscription active</b><span class="tag'+(ms<3600000?' y':'')+'">'+fmtLeft(ms)+' left</span></div><small>You keep everything you earn. Pay again before it ends to add '+SUB_HOURS+' more hours.</small>'
+    : '<div class="row"><b>Subscription ended</b><span class="tag r">Inactive</span></div><small>'+esc(payHint())+'</small>';
+  $('hNew').textContent = live?avail.length:0; $('hOn').textContent=ongoingL().length; $('hDone').textContent=doneL().length; $('hCanc').textContent=cancL().length;
+  $('hTg').classList.toggle('on',live); $('hOnlineTxt').textContent = live?'You are Online':'Go Online';
+  const reqs = live?avail:[];
+  $('reqList').innerHTML = ms<=0 ? '<p class="sub">Your subscription has ended. Renew it to see new delivery requests.</p>'
+    : !me.online ? '<p class="sub">Go online to see new delivery requests.</p>'
     : reqs.length ? reqs.map(o=>'<div class="card" onclick="openReq(\''+o.id+'\')"><div class="row"><b>'+esc(o.orderId)+'</b><span class="tag">'+money(o.fee)+'</span></div><small>'+esc(o.pickup)+' → '+esc(o.dropoff)+'</small><small>'+esc(o.package)+'</small></div>').join('') : '<p class="sub">No new requests right now.</p>';
 }
 window.toggleOnline = async () => {
+  if(!me.online && subMs()<=0) return alert('Your subscription has ended.\n\n'+payHint());
   me.online = !me.online;
   try{ await setDoc(doc(db,'users',auth.currentUser.uid),{online:me.online},{merge:true}); }catch(e){ me.online=!me.online; alert('Could not update. Check your internet.'); }
   pHome();
 };
+function pHelp(){
+  $('helpSub').textContent = 'You pay GH₵'+SUB_PRICE+' for '+SUB_HOURS+' hours of work. The time runs straight from when KwikServe activates you. '+payHint();
+}
 
 /* ---------- request / ongoing / done ---------- */
 window.openReq = id => { selId=id; go('request'); };
@@ -331,14 +380,16 @@ function pRequest0(){
   const o=find(selId); if(!o){ $('reqBox').innerHTML='<p class="sub">This request is no longer available.</p>'; return; }
   $('reqBox').innerHTML =
    '<div class="card"><div class="row"><b>Order '+esc(o.orderId)+'</b><span class="tag y">Pickup</span></div>'+
-   '<small>Sender</small><b>'+esc(nameOf(o.sender))+'</b><small>'+esc(phoneOf(o.sender))+'</small><small>📍 '+esc(o.pickup)+'</small></div>'+
-   '<div class="card"><small>Recipient</small><b>'+esc(nameOf(o.recipient))+'</b><small>'+esc(phoneOf(o.recipient))+'</small><small>📍 '+esc(o.dropoff)+'</small></div>'+
+   '<small>Sender</small><b>'+esc(nameOf(o.sender))+'</b><small>📍 '+esc(o.pickup)+'</small></div>'+
+   '<div class="card"><small>Recipient</small><b>'+esc(nameOf(o.recipient))+'</b><small>📍 '+esc(o.dropoff)+'</small></div>'+
    '<div class="card"><small>Package details</small><b>'+esc(o.package)+'</b></div>'+
    '<div class="card row"><span>Distance (straight line)</span><b id="reqDist">Calculating...</b></div>'+
-   '<div class="card row"><div><small style="margin:0">Estimated fee</small><b style="font-size:24px;color:var(--g)">'+money(o.fee)+'</b></div><span class="tag">'+esc(o.payment)+'</span></div>'+
+   '<div class="card row"><div><small style="margin:0">Delivery fee (yours)</small><b style="font-size:24px;color:var(--g)">'+money(o.fee)+'</b></div><span class="tag">'+esc(o.payment)+'</span></div>'+
+   '<p class="sub">Phone numbers are shown after you accept.</p>'+
    '<button class="btn" onclick="accept(\''+o.id+'\')">Accept order</button><button class="btn ghost" onclick="decline(\''+o.id+'\')">Decline</button>';
 }
 window.accept = async id => {
+  if(subMs()<=0) return alert('Your subscription has ended.\n\n'+payHint());
   const ref=doc(db,'orders',id);
   try{
     await runTransaction(db, async tx => {
@@ -351,9 +402,11 @@ window.accept = async id => {
 };
 window.decline = id => { const d=declined(); d.push(id); store('ks_dec',JSON.stringify(d)); load().then(()=>go('home')); };
 window.deliver = async id => {
+  const o=find(id);
+  if(!confirm('Have you received GH₵'+(o?o.fee:0)+' from the customer?\n\nOnly tap OK if you have been paid.')) return;
   try{
     await updateDoc(doc(db,'orders',id),{status:'Delivered',deliveredAt:serverTimestamp(),stage:4});
-    const o=find(id); $('dId').textContent='Order #'+(o?o.orderId:''); $('dEarn').textContent=money(o?o.fee:0);
+    $('dId').textContent='Order #'+(o?o.orderId:''); $('dEarn').textContent=money(o?o.fee:0);
     await load(); go('done');
   }catch(e){ alert('Could not update. Check your internet.'); }
 };
@@ -384,8 +437,9 @@ function pStatement(){
 
 /* ---------- profile / edit / notifications / settings ---------- */
 function pProfile(){
+  const live=!!me.online && subMs()>0;
   $('pAv').textContent=(me.name[0]||'?').toUpperCase(); $('pName').textContent=me.name;
-  $('pTag').textContent=me.online?'Online':'Offline'; $('pTag').className='tag'+(me.online?'':' off');
+  $('pTag').textContent=live?'Online':'Offline'; $('pTag').className='tag'+(live?'':' off');
   $('pPhone').textContent=me.phone; $('pEmail').textContent=me.email; $('pBike').textContent=me.bike; $('pPlate').textContent=me.plate;
 }
 window.openEdit = m => {
@@ -409,8 +463,8 @@ window.saveEdit = async () => {
 };
 function pNotifs(){
   const items=[];
-  if(me.online) avail.forEach(o=>items.push({t:'New delivery request',s:'Order #'+o.orderId,sec:tsOf(o)}));
-  doneL().forEach(o=>{ items.push({t:'Delivery completed',s:'Order #'+o.orderId,sec:dsec(o)}); items.push({t:'Payment received',s:money(o.fee),sec:dsec(o)}); });
+  if(me.online && subMs()>0) avail.forEach(o=>items.push({t:'New delivery request',s:'Order #'+o.orderId,sec:tsOf(o)}));
+  doneL().forEach(o=>{ items.push({t:'Delivery completed',s:'Order #'+o.orderId,sec:dsec(o)}); items.push({t:'You earned',s:money(o.fee),sec:dsec(o)}); });
   cancL().forEach(o=>items.push({t:'Order cancelled',s:'Order #'+o.orderId,sec:tsOf(o)}));
   items.sort((a,b)=>b.sec-a.sec);
   $('nList').innerHTML = items.length ? items.map(i=>'<div class="card"><b>'+esc(i.t)+'</b><small>'+esc(i.s)+'</small><small>'+ago(i.sec)+'</small></div>').join('') : '<p class="sub">No notifications yet.</p>';
@@ -420,9 +474,17 @@ window.tgl = b => { const on=!b.classList.contains('on'); b.classList.toggle('on
 
 
 /* ---------- map, distance, stages ---------- */
-let map=null, myMarker=null, watchId=null, completing=false, lastSend=0;
+let map=null, myMarker=null, watchId=null, completing=false, lastSend=0, wl=null;
 const geoCache={};
 const icon = e => L.divIcon({html:'<div style="font-size:26px">'+e+'</div>',className:'',iconSize:[26,26],iconAnchor:[13,22]});
+
+/* keep the screen awake while on a delivery so GPS keeps sending */
+async function keepAwake(){
+  try{ if('wakeLock' in navigator && !wl){ wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release',()=>{ wl=null; }); } }catch(e){}
+}
+function sleepOk(){ try{ if(wl){ wl.release(); wl=null; } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && map) keepAwake(); });
+
 async function geocode(addr){
   const k=addr.toLowerCase();
   if(geoCache[k]!==undefined) return geoCache[k];
@@ -445,6 +507,7 @@ function pRequest(){ pRequest0(); const o=find(selId); if(o) calcDist(o); }
 function stopMap(){
   if(watchId!==null && navigator.geolocation){ navigator.geolocation.clearWatch(watchId); }
   watchId=null; myMarker=null;
+  sleepOk();
   if(map){ map.remove(); map=null; }
 }
 function startGps(){
@@ -462,7 +525,7 @@ async function drawMap(o){
   stopMap();
   const m = map = L.map('lmap').setView([5.6037,-0.1870],11);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
-  startGps();
+  startGps(); keepAwake();
   const a=await geocode(o.pickup+', Ghana'); if(map!==m) return;
   const b=await geocode(o.dropoff+', Ghana'); if(map!==m) return;
   const pts=[];
@@ -483,6 +546,7 @@ function pOngoing(){
    '<div id="lmap"></div><p class="sub c" id="distTxt" style="margin:0 0 8px">Loading map...</p>'+
    '<div class="steps">'+names.map((n,i)=>'<div class="'+(st>i?'on':'')+'"><i>'+(i+1)+'</i>'+n+'</div>').join('')+'</div>'+
    '<div class="card"><small style="margin:0">Customer contact</small><b>'+esc(nameOf(o.recipient))+'</b><small>'+esc(phoneOf(o.recipient))+'</small><small>📍 '+esc(o.dropoff)+'</small></div>'+
+   '<div class="card row"><span>Collect from customer</span><b style="color:var(--g)">'+money(o.fee)+'</b></div>'+
    (o.status==='Out for delivery'?'<button class="btn" onclick="nextStage(\''+o.id+'\')">'+nxt+'</button>':'')+
    '<a class="btn ghost" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination='+q+'">Navigate</a>'+
    (tel?'<a class="btn ghost" href="tel:'+esc(tel)+'">📞 Call recipient</a>':'');
@@ -542,10 +606,10 @@ function route(){
   else if(['splash','login','register'].includes(c)) go('home');
 }
 setTimeout(()=>{ splashDone=true; route(); },1800);
-setInterval(()=>{ if(me && ['home','deliveries','notifs'].includes(cur())) load(); },20000);
+setInterval(()=>{ if(me && ['home','deliveries','notifs'].includes(cur())) load(); },15000);
 
 onAuthStateChanged(auth, async u => {
-  if(!u){ me=null; authState='out'; route(); return; }
+  if(!u){ me=null; seenReq=null; authState='out'; route(); return; }
   try{
     let r = await getDoc(doc(db,'users',u.uid));
     for(let i=0;i<5 && !r.exists() && !completing;i++){ await new Promise(x=>setTimeout(x,400)); r = await getDoc(doc(db,'users',u.uid)); }
@@ -553,7 +617,7 @@ onAuthStateChanged(auth, async u => {
     if(!r.exists() || r.data().role!=='rider'){ authState='out'; await signOut(auth); setErr('This account is not a rider account.'); return; }
     if(r.data().approved!==true){ authState='out'; await signOut(auth); setErr('Your account is waiting for admin approval.'); go('login'); return; }
     me=r.data(); authState='in';
-    await load(); route();
+    await load(); route();q
   }catch(e){ authState='out'; setErr('Could not load. Check your internet.'); route(); }
 });
 </script>
