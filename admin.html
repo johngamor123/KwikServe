@@ -78,7 +78,7 @@ nav button em{position:absolute;top:-2px;right:2px;background:#e74c3c;color:#fff
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {getFirestore,doc,getDoc,updateDoc,collection,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {getFirestore,doc,getDoc,updateDoc,collection,onSnapshot,Timestamp,increment} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey: "AIzaSyB2PwMANFFwt8Q1Lr3que1MmMfNFJM1fCs",
@@ -90,29 +90,54 @@ const app = initializeApp({
 });
 const auth = getAuth(app), db = getFirestore(app);
 const $ = id => document.getElementById(id);
-let orders=[], users=[], tab='home', oF='All', rF='All', adminEmail='';
+let orders=[], users=[], tab='home', oF='All', rF='All', adminEmail='', seen=null, unsubs=[];
+
+/* ---- rider subscription: GH₵30 for 12 hours ---- */
+const SUB_PRICE=30, SUB_HOURS=12;
 
 const esc = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const showErr = m => {const e=$('err');e.textContent=m;e.style.display='block'};
 const riders = () => users.filter(u=>u.role==='rider');
 const customers = () => users.filter(u=>u.role==='customer');
 const money = n => 'GH₵ ' + n;
+const subMs = u => (u.subEnds && u.subEnds.toMillis) ? u.subEnds.toMillis()-Date.now() : 0;
+const fmtLeft = ms => { const m=Math.floor(ms/60000); return Math.floor(m/60)+'h '+(m%60)+'m left'; };
+
+/* ---- new order alert (sound + vibration) ---- */
+let actx=null;
+document.addEventListener('click',()=>{ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } });
+function beep(){
+  try{
+    if(actx){ const o=actx.createOscillator(), g=actx.createGain(); o.connect(g); g.connect(actx.destination); o.frequency.value=880; g.gain.value=.2; o.start(); o.stop(actx.currentTime+.4); }
+  }catch(e){}
+  if(navigator.vibrate) navigator.vibrate(300);
+}
 
 window.login = async () => {
   try{ await signInWithEmailAndPassword(auth,$('email').value.trim(),$('pass').value); }
   catch(e){ showErr('Wrong email or password.'); }
 };
 window.logout = () => signOut(auth);
-window.setTab = async t => { tab=t; await load(); };
+window.setTab = t => { tab=t; render(); window.scrollTo(0,0); };
 window.setOF = f => { oF=f; render(); };
 window.setRF = f => { rF=f; render(); };
 window.setStatus = async (id,st) => {
-  try{ await updateDoc(doc(db,'orders',id),{status:st}); const o=orders.find(x=>x.id===id); if(o)o.status=st; render(); }
+  if(st==='Cancelled' && !confirm('Cancel this order? This cannot be undone.')) return;
+  try{ await updateDoc(doc(db,'orders',id),{status:st}); }
   catch(e){ alert('Could not update. Check your internet.'); }
 };
 window.setApproval = async (id,v) => {
-  try{ await updateDoc(doc(db,'users',id),{approved:v}); const u=users.find(x=>x.id===id); if(u)u.approved=v; render(); }
+  if(v===false && !confirm('Suspend this rider?')) return;
+  try{ await updateDoc(doc(db,'users',id),{approved:v}); }
   catch(e){ alert('Could not update. Make sure the new rules are published.'); }
+};
+window.activate = async id => {
+  const u=users.find(x=>x.id===id); if(!u) return;
+  if(!confirm('Activate '+SUB_HOURS+' hours for '+(u.name||'this rider')+'? Only do this after you have received GH₵'+SUB_PRICE+'.')) return;
+  const base=Math.max(Date.now(), u.subEnds&&u.subEnds.toMillis ? u.subEnds.toMillis() : 0);
+  try{
+    await updateDoc(doc(db,'users',id),{subEnds:Timestamp.fromMillis(base+SUB_HOURS*3600*1000), subCount:increment(1)});
+  }catch(e){ alert('Could not activate. Check your internet.'); }
 };
 
 function chips(list,cur,fn){
@@ -137,26 +162,32 @@ function docsHtml(u){
 }
 window.zoom = s => { $('zoom').firstElementChild.src=s; $('zoom').style.display='flex'; };
 function riderCard(u){
-  const tag = u.approved!==true ? '<span class="tag wait">Pending approval</span>' : (u.online?'<span class="tag">Online</span>':'<span class="tag off">Offline</span>');
-  const act = u.approved!==true ? '<button class="f" onclick="setApproval(\''+u.id+'\',true)">Approve</button>' : '<button class="c2" onclick="setApproval(\''+u.id+'\',false)">Suspend</button>';
-  return '<div class="card"><div class="row"><b>'+esc(u.name)+'</b>'+tag+'</div><small>'+esc(u.phone)+' · '+esc(u.email)+'</small><small>'+esc(u.bike)+' · '+esc(u.plate)+'</small>'+docsHtml(u)+'<div class="acts">'+act+'</div></div>';
+  const ms=subMs(u);
+  const tag = u.approved!==true ? '<span class="tag wait">Pending approval</span>' : (ms>0 ? '<span class="tag">'+fmtLeft(ms)+'</span>' : '<span class="tag off">Not subscribed</span>');
+  const act = u.approved!==true
+    ? '<button class="f" onclick="setApproval(\''+u.id+'\',true)">Approve</button>'
+    : '<button class="f" onclick="activate(\''+u.id+'\')">Activate '+SUB_HOURS+' hrs</button><button class="c2" onclick="setApproval(\''+u.id+'\',false)">Suspend</button>';
+  return '<div class="card"><div class="row"><b>'+esc(u.name)+'</b>'+tag+'</div><small>'+esc(u.phone)+' · '+esc(u.email)+'</small><small>'+esc(u.bike)+' · '+esc(u.plate)+'</small>'+
+    (u.approved===true?'<small>'+(u.online?'🟢 Online':'⚪ Offline')+' · Subscriptions paid: '+(u.subCount||0)+'</small>':'')+docsHtml(u)+'<div class="acts">'+act+'</div></div>';
 }
 
 function render(){
+  if(!$('view')) return;
   const pend = riders().filter(r=>r.approved!==true).length;
   $('badge').style.display = pend ? 'block':'none'; $('badge').textContent = pend;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
   const delivered = orders.filter(o=>o.status==='Delivered');
-  const revenue = delivered.reduce((a,o)=>a+(Number(o.fee)||0),0);
+  const subRev = riders().reduce((a,u)=>a+(Number(u.subCount)||0),0)*SUB_PRICE;
   let h='';
   if(tab==='home'){
     const pendO = orders.filter(o=>o.status==='Pending').length;
-    const activeR = riders().filter(r=>r.approved===true && r.online).length;
+    const activeR = riders().filter(r=>r.approved===true && r.online && subMs(r)>0).length;
     h += '<h3>Dashboard</h3><div class="stats">'+
       '<div class="st" style="background:var(--g)"><small>Total orders</small><b>'+orders.length+'</b></div>'+
       '<div class="st" style="background:#2a7de1"><small>Active riders</small><b>'+activeR+'</b></div>'+
       '<div class="st" style="background:#e67e22"><small>Pending orders</small><b>'+pendO+'</b></div>'+
-      '<div class="st" style="background:#7d3cf0"><small>Total revenue</small><b>'+money(revenue)+'</b></div></div>';
+      '<div class="st" style="background:#7d3cf0"><small>Subscription revenue</small><b>'+money(subRev)+'</b></div></div>';
+    if(pendO) h += '<div class="alert" onclick="setTab(\'orders\')">'+pendO+' new order'+(pendO>1?'s are':' is')+' waiting to be accepted. Tap to review.</div>';
     if(pend) h += '<div class="alert" onclick="setTab(\'riders\')">'+pend+' rider'+(pend>1?'s are':' is')+' waiting for approval. Tap to review.</div>';
     const days=[], now=new Date(); now.setHours(0,0,0,0);
     for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);days.push(d);}
@@ -175,38 +206,51 @@ function render(){
     h += '<h3>Customers ('+l.length+')</h3>'+(l.length?l.map(u=>'<div class="card"><div class="row"><b>'+esc(u.name||'No name')+'</b><span class="tag">'+orders.filter(o=>o.uid===u.id).length+' orders</span></div><small>'+esc(u.phone||'No phone')+' · '+esc(u.email)+'</small></div>').join(''):'<p class="sub">No customers yet.</p>');
   }
   if(tab==='riders'){
-    const l = riders().filter(r=> rF==='All' || (rF==='Pending approval'&&r.approved!==true) || (rF==='Online'&&r.approved===true&&r.online) || (rF==='Offline'&&r.approved===true&&!r.online));
-    h += '<h3>Riders</h3>'+chips(['All','Pending approval','Online','Offline'],rF,'setRF')+(l.length?l.map(riderCard).join(''):'<p class="sub">No riders here.</p>');
+    const l = riders().filter(r=> rF==='All' || (rF==='Pending approval'&&r.approved!==true) || (rF==='Subscribed'&&r.approved===true&&subMs(r)>0) || (rF==='Expired'&&r.approved===true&&subMs(r)<=0) || (rF==='Online'&&r.approved===true&&r.online));
+    h += '<h3>Riders</h3>'+chips(['All','Pending approval','Subscribed','Expired','Online'],rF,'setRF')+(l.length?l.map(riderCard).join(''):'<p class="sub">No riders here.</p>');
   }
   if(tab==='more'){
     const rate = orders.length ? Math.round(delivered.length/orders.length*100) : 0;
     h += '<h3>Reports</h3><div class="stats">'+
       '<div class="st" style="background:var(--g)"><small>Total orders</small><b>'+orders.length+'</b></div>'+
-      '<div class="st" style="background:#7d3cf0"><small>Revenue</small><b>'+money(revenue)+'</b></div>'+
+      '<div class="st" style="background:#7d3cf0"><small>Subscription revenue</small><b>'+money(subRev)+'</b></div>'+
       '<div class="st" style="background:#2a7de1"><small>Delivered</small><b>'+delivered.length+'</b></div>'+
       '<div class="st" style="background:#e67e22"><small>Completion rate</small><b>'+rate+'%</b></div></div>'+
       '<h3>Admin</h3><div class="item">Signed in as<span>'+esc(adminEmail)+'</span></div>'+
-      '<div class="item">Support tickets<span>Coming soon</span></div><div class="item">Payment settings<span>Coming soon</span></div><div class="item">SMS settings<span>Coming soon</span></div>'+
+      '<div class="item">Rider subscription<span>GH₵'+SUB_PRICE+' for '+SUB_HOURS+' hours</span></div>'+
+      '<div class="item">Support tickets<span>Coming soon</span></div><div class="item">SMS settings<span>Coming soon</span></div>'+
       '<button class="btn" style="background:#c0392b;margin-top:8px" onclick="logout()">Log out</button>';
   }
   $('view').innerHTML = h;
 }
-async function load(){
-  const [o,u] = await Promise.all([getDocs(collection(db,'orders')),getDocs(collection(db,'users'))]);
-  const ts = x => (x.createdAt && x.createdAt.seconds) || 0;
-  orders = o.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>ts(b)-ts(a));
-  users = u.docs.map(d=>({id:d.id,...d.data()}));
-  render(); window.scrollTo(0,0);
+
+/* ---- live data ---- */
+function listen(){
+  unsubs.forEach(f=>f());
+  unsubs=[
+    onSnapshot(collection(db,'orders'), s=>{
+      const ts = x => (x.createdAt && x.createdAt.seconds) || Date.now()/1000;
+      orders = s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>ts(b)-ts(a));
+      if(seen && orders.some(o=>o.status==='Pending' && !seen.has(o.id))) beep();
+      seen = new Set(orders.map(o=>o.id));
+      render();
+    }, ()=>{}),
+    onSnapshot(collection(db,'users'), s=>{
+      users = s.docs.map(d=>({id:d.id,...d.data()}));
+      render();
+    }, ()=>{})
+  ];
 }
+setInterval(()=>{ if(adminEmail) render(); }, 60000);
 
 onAuthStateChanged(auth, async u => {
-  if(!u){ $('app').style.display='none'; $('nav').style.display='none'; $('loginBox').style.display='block'; return; }
+  if(!u){ unsubs.forEach(f=>f()); unsubs=[]; seen=null; adminEmail=''; $('app').style.display='none'; $('nav').style.display='none'; $('loginBox').style.display='block'; return; }
   try{
     const r = await getDoc(doc(db,'users',u.uid));
     if(!r.exists() || r.data().role !== 'admin'){ await signOut(auth); showErr('This account is not an admin.'); return; }
     adminEmail = u.email;
     $('loginBox').style.display='none'; $('app').style.display='block'; $('nav').style.display='flex';
-    await load();
+    listen();
   }catch(e){ showErr('Could not load. Check your internet.'); }
 });
 </script>
